@@ -1,18 +1,22 @@
 import { MongoClient, Db } from 'mongodb';
-import * as dotenv from 'dotenv';
 
-dotenv.config();
-
-const uri = process.env.MONGODB_URI;
-
-if (!uri) {
-  throw new Error('MONGODB_URI environment variable is not defined');
-}
-
-const client = new MongoClient(uri);
-
+let client: MongoClient | null = null;
 let db: Db | null = null;
 let isConnected = false;
+
+function getMongoClient(): MongoClient {
+  if (!client) {
+    const uri = process.env.MONGODB_URI;
+    
+    if (!uri) {
+      throw new Error('MONGODB_URI environment variable is not defined');
+    }
+    
+    client = new MongoClient(uri);
+  }
+  
+  return client;
+}
 
 export async function connectToDatabase(): Promise<Db> {
   if (isConnected && db) {
@@ -20,11 +24,12 @@ export async function connectToDatabase(): Promise<Db> {
   }
 
   try {
-    await client.connect();
+    const mongoClient = getMongoClient();
+    await mongoClient.connect();
     console.log('Successfully connected to MongoDB Atlas');
     
     // Replace 'your-database-name' with your actual database name
-    db = client.db(process.env.MONGODB_PRODUCTS_DB_NAME || 'products');
+    db = mongoClient.db(process.env.MONGODB_PRODUCTS_DB_NAME || 'products');
     isConnected = true;
     
     return db;
@@ -35,10 +40,11 @@ export async function connectToDatabase(): Promise<Db> {
 }
 
 export async function closeConnection(): Promise<void> {
-  if (isConnected) {
+  if (isConnected && client) {
     await client.close();
     isConnected = false;
     db = null;
+    client = null;
     console.log('MongoDB connection closed');
   }
 }
@@ -50,4 +56,4 @@ export function getDatabase(): Db {
   return db;
 }
 
-export { client };
+export { getMongoClient as client };

@@ -1,10 +1,15 @@
 import { Listr } from "listr2";
-import { scrapAmazon } from "./scrappers/amazon";
-import { connectToDatabase, closeConnection } from "./mongodb/connection";
-import { Product } from "./mongodb/models/products";
+import { scrapAmazon } from "./amazon";
+import { connectToDatabase, closeConnection, Product, deleteExpiredProducts, createOrUpdateProducts } from "@poupaia/db";
 import * as dotenv from 'dotenv';
+import path from 'path';
+import { existsSync } from 'fs';
 
-dotenv.config();
+// Carregar .env da pasta apps/scraper (apenas em desenvolvimento local)
+const envPath = path.resolve(__dirname, '../.env');
+if (existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+}
 
 async function main() {
   const startTime = Date.now();
@@ -33,26 +38,8 @@ async function main() {
           task.title = "Nenhum produto encontrado";
           return;
         }
-
-        // Salvar produtos no MongoDB (upsert para evitar duplicados)
-        const collection = ctx.db.collection('products');
         
-        const bulkOps = products.map(product => {
-          const { createdAt, ...productWithoutCreatedAt } = product;
-          
-          return {
-            updateOne: {
-              filter: { id: product.id },
-              update: { 
-                $set: productWithoutCreatedAt,
-                $setOnInsert: { createdAt }
-              },
-              upsert: true
-            }
-          };
-        });
-
-        const result = await collection.bulkWrite(bulkOps);
+        const result = await createOrUpdateProducts(ctx.db, products);
         
         task.title = `${result.upsertedCount} novos, ${result.modifiedCount} atualizados (${products.length} total)`;
       },
@@ -60,15 +47,8 @@ async function main() {
     {
       title: "A eliminar produtos expirados",
       task: async (ctx, task) => {
-        const collection = ctx.db.collection('products');
-        
-        // Eliminar produtos onde expiresAt já passou
-        const result = await collection.deleteMany({
-          expiresAt: { 
-            $ne: null,
-            $lt: new Date().toISOString()
-          }
-        });
+    
+        const result = await deleteExpiredProducts(ctx.db);
         
         if (result.deletedCount === 0) {
           task.title = "Nenhum produto expirado";

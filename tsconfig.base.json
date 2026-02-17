@@ -1,0 +1,19 @@
+{
+  // Visit https://aka.ms/tsconfig to read more about this file
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@poupaia/db/*": ["packages/db/src/*"],
+      "@poupaia/utils/*": ["packages/utils/src/*"],
+      "@poupaia/mocks/*": ["packages/mocks/src/*"]
+    }
+  }
+}

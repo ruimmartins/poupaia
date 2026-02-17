@@ -1,4 +1,4 @@
-import { Product } from "../mongodb/models/products";
+import { Product } from "../db/src/models/products";
 
 export const mockProducts: Product[] = [
   {
@@ -61,7 +61,7 @@ export const mockProducts: Product[] = [
     category: "Livros e Ebooks",
     createdAt: "2026-02-12T18:20:00Z",
     updatedAt: "2026-02-13T08:00:00Z",
-    expiresAt: null,
+    expiresAt: "2026-02-13T08:00:00Z",
     status: "pending",
     postCount: 0
   },
@@ -125,7 +125,7 @@ export const mockProducts: Product[] = [
     category: "Informática > Periféricos",
     createdAt: "2026-02-11T14:20:00Z",
     updatedAt: "2026-02-13T06:30:00Z",
-    expiresAt: null,
+    expiresAt: "2026-02-13T08:00:00Z",
     status: "rejected",
     postCount: 0
   },
@@ -141,7 +141,7 @@ export const mockProducts: Product[] = [
     category: "Casa e Cozinha",
     createdAt: "2026-02-13T12:30:00Z",
     updatedAt: "2026-02-13T12:30:00Z",
-    expiresAt: null,
+    expiresAt: "2026-02-13T20:00:00Z",
     aiAnalysis: {
       dealScore: 8.5,
       summary: "Excelente preço para aspirador robot premium com estação de auto-esvaziamento",
