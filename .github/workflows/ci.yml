@@ -52,7 +52,7 @@ jobs:
 
       - name: Instalar Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Executar scraper
         run: pnpm run scraper
