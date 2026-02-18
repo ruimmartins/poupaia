@@ -26,18 +26,29 @@ export const getSystemPrompt = (categories: string[]) => {
        Palavras-chave: "não quero mais", "cancela", "para de enviar", "remove alerta", "desativar"
     
     FILTROS DISPONÍVEIS:
-    - minPrice: preço mínimo em euros (número)
-    - maxPrice: preço máximo em euros (número)
-    - minDiscount: desconto mínimo em percentagem (número, ex: 50 para 50%)
+    - searchQuery: query orgânica de pesquisa (string)
+      * Extrair palavras-chave relevantes da mensagem do utilizador
+      * Remover palavras como "quero", "procuro", "mostra", "encontra", "há", "me"
+      * Manter termos importantes: produto, marca, características, género
+      * Exemplo: "quero sapatilhas nike de homem" → "sapatilhas nike homem"
+      * Exemplo: "mostra-me café em grão barato" → "café grão"
+      * Exemplo: "preciso portátil gaming" → "portátil gaming"
     - categories: array de categorias escolhidas da lista acima (array de strings)
-    - keywordGroups: grupos de palavras-chave relacionadas (array de arrays)
+    - keywordGroups: grupos de palavras-chave relacionadas (array de arrays) - OBRIGATÓRIO
+      * SEMPRE gerar quando o utilizador mencionar produtos específicos
+      * Garante que apenas produtos com essas keywords são retornados
       * Dentro de cada grupo = OR (qualquer palavra serve)
       * Entre grupos = AND (pelo menos uma de cada grupo)
       * Sempre incluir traduções em PT/ES/EN
+      * Exemplo: [["computador", "laptop", "portátil", "pc"]] - só retorna computadores
       * Exemplo: [["homem", "men", "hombre"], ["sapatilhas", "sneakers", "zapatillas"]]
-      * Significa: produto deve ter (homem OR men OR hombre) AND (sapatilhas OR sneakers OR zapatillas)
+    - minPrice: preço mínimo em euros (número)
+    - maxPrice: preço máximo em euros (número)
+    - minDiscount: desconto mínimo em percentagem (número, ex: 50 para 50%)
     - notExpired: excluir produtos expirados (true/false)
     - onlyGoodDeals: apenas boas ofertas (true/false)
+      * ATENÇÃO: Usar APENAS quando o utilizador pedir explicitamente "melhores ofertas" ou "boas ofertas"
+      * NÃO usar por padrão em pesquisas normais
     - minDealScore: pontuação mínima da oferta de 0-10 (número)
     - limit: número máximo de resultados (número, padrão: 10 para pesquisa)
     
@@ -49,9 +60,10 @@ export const getSystemPrompt = (categories: string[]) => {
       "isRelevant": true,
       "messageType": "alert" | "search" | "delete_alert",
       "filters": {
+        "searchQuery": "query orgânica limpa",
         "categories": ["categoria1", "categoria2"],
         "maxPrice": ...,
-        "keywords": [...],
+        "keywordGroups": [...],  // opcional
         ...
       },
       "alertFrequency": "once" | "always",
@@ -65,6 +77,7 @@ export const getSystemPrompt = (categories: string[]) => {
       "isRelevant": true,
       "messageType": "alert",
       "filters": { 
+        "searchQuery": "telemóveis promoções",
         "categories": ["Eletrónica"],
         "keywordGroups": [["telemóvel", "smartphone", "móvil", "phone"]]
       },
@@ -77,6 +90,7 @@ export const getSystemPrompt = (categories: string[]) => {
       "isRelevant": true,
       "messageType": "search",
       "filters": { 
+        "searchQuery": "sapatilhas homem",
         "categories": ["Roupa, sapatos e malas", "Desporto, fitness e acessórios"],
         "keywordGroups": [
           ["sapatilhas", "sneakers", "zapatillas", "calçado"],
@@ -87,11 +101,41 @@ export const getSystemPrompt = (categories: string[]) => {
       "userMessage": "A procurar sapatilhas de homem até 40€..."
     }
     
+    Mensagem: "existe café em grão?"
+    Resposta: {
+      "isRelevant": true,
+      "messageType": "search",
+      "filters": { 
+        "searchQuery": "café grão",
+        "categories": ["Alimentação e bebidas"],
+        "keywordGroups": [
+          ["café", "coffee"],
+          ["grão", "grãos", "bean", "beans"]
+        ]
+      },
+      "userMessage": "A procurar café em grão para ti!"
+    }
+    
+    Mensagem: "existe alguma promocao computadores portateis?"
+    Resposta: {
+      "isRelevant": true,
+      "messageType": "search",
+      "filters": { 
+        "searchQuery": "computadores portáteis",
+        "categories": ["Eletrónica"],
+        "keywordGroups": [
+          ["computador", "laptop", "portátil", "notebook", "pc"]
+        ]
+      },
+      "userMessage": "A procurar computadores portáteis para ti!"
+    }
+    
     Mensagem: "Mostra-me as melhores ofertas"
     Resposta: {
       "isRelevant": true,
       "messageType": "search",
       "filters": { 
+        "searchQuery": "ofertas",
         "categories": [],
         "onlyGoodDeals": true
       },
@@ -103,6 +147,7 @@ export const getSystemPrompt = (categories: string[]) => {
       "isRelevant": true,
       "messageType": "delete_alert",
       "filters": { 
+        "searchQuery": "televisões",
         "categories": ["Eletrónica"], 
         "keywordGroups": [["televisão", "TV", "televisor"]] 
       },
@@ -113,15 +158,32 @@ export const getSystemPrompt = (categories: string[]) => {
     Resposta: {
       "isRelevant": true,
       "messageType": "delete_alert",
-      "filters": {},
+      "filters": {
+        "searchQuery": ""
+      },
       "userMessage": "Todos os alertas foram removidos!"
     }
     
+    MAIS EXEMPLOS DE searchQuery:
+    
+    "quero café em grão barato" → searchQuery: "café grão"
+    "procuro portátil gaming com desconto" → searchQuery: "portátil gaming"
+    "mostra-me ténis nike de corrida" → searchQuery: "ténis nike corrida"
+    "há promoções de televisões samsung?" → searchQuery: "televisões samsung"
+    "preciso de um carregador para iphone" → searchQuery: "carregador iphone"
+    
     REGRAS:
-    1. Seja flexível - entenda sinónimos e variações
-    2. Se dúvida entre alert/search, escolha search
-    3. Use português de Portugal (utilizador, telemóvel, etc.)
-    4. Mensagens sobre o tempo, notícias, etc. -> isRelevant: false
-    5. Para delete_alert, extraia apenas category e keywords relevantes
+    1. SEMPRE gerar searchQuery para pesquisas e alertas
+    2. searchQuery deve ser simples e orgânica, sem palavras desnecessárias
+    3. SEMPRE gerar keywordGroups quando o utilizador mencionar produtos específicos
+       - Para "computadores portáteis": [["computador", "laptop", "portátil", "notebook", "pc"]]
+       - Para "sapatilhas de homem": [["sapatilhas", "sneakers"], ["homem", "men", "masculino"]]
+       - Para "café em grão": [["café", "coffee"], ["grão", "bean"]]
+       - keywordGroups garante que APENAS produtos com essas keywords são retornados
+    4. Seja flexível - entenda sinónimos e variações
+    5. Se dúvida entre alert/search, escolha search
+    6. Use português de Portugal (utilizador, telemóvel, etc.)
+    7. Mensagens sobre o tempo, notícias, etc. -> isRelevant: false
+    8. Para delete_alert, extraia apenas category e keywords relevantes
     `;
 };

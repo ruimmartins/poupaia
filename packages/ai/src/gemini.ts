@@ -29,6 +29,11 @@ export interface ProcessedMessage {
   responseMessage: string;
 }
 
+export interface ProductMessage {
+  text: string;
+  imageUrl?: string;
+}
+
 /**
  * Processa mensagem do utilizador e identifica tipo + extrai filtros
  */
@@ -141,15 +146,26 @@ export async function processUserMessage(systemInstruction: string, userMessage:
 
 /**
  * Formata produtos para enviar ao utilizador
+ * Retorna um array de mensagens, uma por produto (máximo 5)
  */
-export function formatProductsForUser(products: Product[]): string {
+export function formatProductsForUser(products: Product[]): ProductMessage[] {
   if (products.length === 0) {
-    return '😔 Não encontrei produtos com esses critérios. Tenta ser menos específico!';
+    return [{
+      text: '😔 Não encontrei produtos com esses critérios. Tenta ser menos específico!'
+    }];
   }
 
-  let message = `🎉 Encontrei ${products.length} produto(s) para ti:\n\n`;
+  const messages: ProductMessage[] = [];
+  
+  // Mensagem inicial
+  messages.push({
+    text: `🎉 Encontrei ${products.length} produto(s) para ti!`
+  });
 
-  for (const [index, product] of products.entries()) {
+  // Limitar a 5 produtos
+  const productsToShow = products.slice(0, 5);
+  
+  for (const product of productsToShow) {
     // Garantir que preços são números
     const currentPrice = typeof product.currentPrice === 'string' 
       ? parseFloat(product.currentPrice) 
@@ -167,19 +183,14 @@ export function formatProductsForUser(products: Product[]): string {
     
     const emoji = discount >= 60 ? '🔥' : discount >= 40 ? '⚡' : '💰';
     
-    message += `${emoji} **${product.title}**\n`;
-    message += `Promoção vista em: **${product.updatedAt}**\n`;
+    let message = `${emoji} **${product.title}**\n\n`;
     
     // Formatar preço com desconto
     if (discount && originalPrice) {
-      message += `💶 ~~${originalPrice.toFixed(2)}€~~ → **${currentPrice.toFixed(2)}€** (${discount}% OFF)\n`;
+      message += `💶 ~~${originalPrice.toFixed(2)}€~~ → **${currentPrice.toFixed(2)}€** (-${discount}%)\n`;
     } else {
       message += `💶 **${currentPrice.toFixed(2)}€**\n`;
     }
-    
-    /* if (product.description) {
-      message += `📝 ${product.description}\n`;
-    } */
     
     if (product.expiresAt) {
       const expiryDate = new Date(product.expiresAt);
@@ -187,17 +198,24 @@ export function formatProductsForUser(products: Product[]): string {
       const hoursLeft = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60));
       
       if (hoursLeft < 24) {
-        message += `⏰ Expira em ${hoursLeft}h!\n`;
+        message += `⏰ Expira em ${hoursLeft}h\n`;
       }
     }
     
-    message += `🛒 ${product.url}\n\n`;
+    message += `\n🛒 ${product.url}`;
     
-    if (index >= 4) { // Limitar a 5 produtos na mensagem
-      message += `... e mais ${products.length - index - 1} produto(s)`;
-      break;
-    }
+    messages.push({
+      text: message,
+      imageUrl: product.imageUrl
+    });
+  }
+  
+  // Mensagem final se houver mais produtos
+  if (products.length > 5) {
+    messages.push({
+      text: `... e mais ${products.length - 5} produto(s)! Refina a tua pesquisa para ver mais.`
+    });
   }
 
-  return message;
+  return messages;
 }

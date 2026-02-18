@@ -139,15 +139,6 @@ export async function findProductsForUser(
     });
   }
 
-  // Filtros de AI
-  if (filters.minDealScore !== undefined) {
-    mongoFilter['aiAnalysis.dealScore'] = { $gte: filters.minDealScore };
-  }
-
-  if (filters.onlyGoodDeals) {
-    mongoFilter['aiAnalysis.isGoodDeal'] = true;
-  }
-
   // Construir ordenação
   const sort: Record<string, 1 | -1> = {};
   if (filters.sortBy) {
@@ -183,4 +174,101 @@ export async function findProductsForUser(
   }
 
   return await query.toArray();
+}
+
+/**
+ * Busca produtos com text search (ordenado por relevância)
+ * Usa o text index criado para pesquisa orgânica
+ */
+export async function searchProducts(
+  db: Db,
+  searchQuery: string,
+  filters: Partial<ProductFilters> = {}
+): Promise<Product[]> {
+  const collection = await getProductsCollection(db);
+
+  // Construir query com text search
+  const query: any = {
+    $text: { $search: searchQuery }
+  };
+
+  // Adicionar filtros opcionais
+  const andConditions: any[] = [];
+
+  // Filtro de categorias
+  if (filters.categories && filters.categories.length > 0) {
+    query.category = { $in: filters.categories };
+  }
+
+  // Filtro de preço
+  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+    query.currentPrice = {};
+    if (filters.minPrice !== undefined) {
+      query.currentPrice.$gte = filters.minPrice;
+    }
+    if (filters.maxPrice !== undefined) {
+      query.currentPrice.$lte = filters.maxPrice;
+    }
+  }
+
+  // Filtro de desconto
+  if (filters.minDiscount !== undefined) {
+    query.discountPercentage = { $gte: filters.minDiscount };
+  }
+
+  // Filtro de keyword groups (para garantir precisão APENAS no título)
+  // Exemplo: [["computador", "laptop"], ["portátil"]] = deve ter (computador OR laptop) AND (portátil)
+  if (filters.keywordGroups && filters.keywordGroups.length > 0) {
+    const keywordConditions = filters.keywordGroups.map((group) => {
+      // Palavras que precisam de word boundary (inglês)
+      const wordsNeedingBoundary = ['men', 'man', 'boy', 'girl', 'kid', 'baby', 'toddler', 'laptop', 'pc', 'computer'];
+      
+      return {
+        $or: group.map((keyword) => {
+          const needsBoundary = wordsNeedingBoundary.includes(keyword.toLowerCase());
+          const pattern = needsBoundary 
+            ? `\\b${keyword}\\b` 
+            : keyword;
+          
+          return { title: { $regex: pattern, $options: 'i' } };
+        }),
+      };
+    });
+
+    andConditions.push(...keywordConditions);
+  }
+
+  // Filtros de tempo
+  if (filters.notExpired) {
+    andConditions.push({
+      $or: [{ expiresAt: null }, { expiresAt: { $gte: new Date().toISOString() } }],
+    });
+  }
+
+  // Filtros de AI (comentados temporariamente até os produtos terem aiAnalysis)
+  // TODO: Descomentar quando o scraper adicionar aiAnalysis aos produtos
+  /* if (filters.minDealScore !== undefined) {
+    query['aiAnalysis.dealScore'] = { $gte: filters.minDealScore };
+  }
+
+  if (filters.onlyGoodDeals) {
+    query['aiAnalysis.isGoodDeal'] = true;
+  } */
+
+  if (andConditions.length > 0) {
+    query.$and = andConditions;
+  }
+
+  // Buscar com score de relevância
+  const results = await collection
+    .find(query, {
+      projection: {
+        score: { $meta: 'textScore' }
+      }
+    })
+    .sort({ score: { $meta: 'textScore' } }) // Ordenar por relevância
+    .limit(filters.limit || 20)
+    .toArray();
+
+  return results;
 }

@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node"
 import { handleMessage } from "../src/handleMessage"
+import { sendTelegramMessage, sendTelegramPhoto } from "@poupaia/messaging"
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -18,13 +19,26 @@ export default async function handler(
 
   const update = req.body
 
-  if (!update.message) {
-    return res.status(200).send("OK")
+  res.status(200).send("OK")
+
+  const messages = await handleMessage(update.message)
+  const chatId = update.message.chat.id;
+
+  console.log(`📤 Sending ${messages.length} message(s) to chat ${chatId}`);
+
+  // Enviar cada mensagem
+  for (const msg of messages) {
+    if (msg.imageUrl) {
+      // Enviar mensagem com imagem
+      await sendTelegramPhoto(chatId, msg.imageUrl, msg.text);
+    } else {
+      // Enviar mensagem de texto
+      await sendTelegramMessage(chatId, msg.text);
+    }
+    
+    // Pequeno delay entre mensagens para evitar rate limiting
+    await new Promise(resolve => setTimeout(resolve, 300));
   }
-
-  const response = await handleMessage(update.message)
-
-  console.log('📤 Response to send:', response);
 
   return res.status(200).send("OK")
 }

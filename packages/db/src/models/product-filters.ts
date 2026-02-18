@@ -1,4 +1,7 @@
 export interface ProductFilters {
+  // Pesquisa orgânica
+  searchQuery?: string;       // Query de pesquisa orgânica (usado com text search)
+  
   // Filtros de preço
   minPrice?: number;
   maxPrice?: number;

@@ -6,6 +6,7 @@ export interface Product {
   title: string;              
   currentPrice: number;       // Cleaned decimal (e.g., 29.99)
   originalPrice: number | null; // For discount calculation
+  brand: string | null;       // Optional brand name
   currency: string;           // "EUR"
   discountPercentage: number; // Calculated: ((original - current) / original) * 100
   
@@ -20,16 +21,12 @@ export interface Product {
   expiresAt: string | null;     // Especially for Lightning Deals (Ofertas Flash)
   
   // --- AI Analysis (Gemini Output) ---
-  aiAnalysis?: {
+  /* aiAnalysis?: {
     dealScore: number;        // 0 to 10 (AI's rating of the deal)
     summary: string;          // One-sentence sales pitch
     pros: string[];           // List of key benefits
     cons: string[];           // Any warnings (e.g., "only for Prime")
     isGoodDeal: boolean;      // Final verdict
     telegramPost: string;     // The final formatted text for the channel
-  };
-
-  // --- Bot Lifecycle ---
-  status: 'pending' | 'analyzed' | 'posted' | 'rejected';
-  postCount: number;          // How many times this was sent to the channel
+  }; */
 }
