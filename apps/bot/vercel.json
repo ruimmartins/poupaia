@@ -1,7 +1,5 @@
 {
-  "version": 2,
   "installCommand": "cd ../.. && pnpm install",
-  "buildCommand": "echo 'No build needed'",
   "functions": {
     "api/**/*.ts": {
       "maxDuration": 30
