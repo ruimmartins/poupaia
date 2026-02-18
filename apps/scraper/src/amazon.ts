@@ -12,7 +12,7 @@ const clickWithRandomDelay = async (element: any, baseDelay: number = 1000) => {
 
 async function autoScroll(page: Page, times: number = 5, intervalMs: number = 1000) {
   for (let i = 0; i < times; i++) {
-    const amountPxScrolled = Math.random() * 300 + 200; // Rola entre 200 e 500 pixels
+    const amountPxScrolled = Math.random() * 300 + 200;
     await page.evaluate(amount => {
       window.scrollBy(0, amount);
     }, amountPxScrolled);
@@ -24,17 +24,13 @@ async function autoScroll(page: Page, times: number = 5, intervalMs: number = 10
 const parseProductData = (data: any, currentCategory: string): Product[] => {
   const result: Product[] = [];
 
-  // Validar estrutura básica
   if (!data?.entity?.rankedPromotions || !Array.isArray(data.entity.rankedPromotions)) {
-    /* console.warn('Invalid data structure: missing entity or rankedPromotions'); */
     return result;
   }
 
   for (const product of data.entity.rankedPromotions) {
     try {
-      // Validar estrutura do produto
       if (!product?.product?.entity) {
-        /* console.warn('Skipping product: missing product.entity'); */
         continue;
       }
 
@@ -42,7 +38,6 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
       const buyingOption = productEntity.buyingOptions?.[0];
       
       if (!buyingOption) {
-        /* console.warn('Skipping product: no buying options available'); */
         continue;
       }
 
@@ -51,9 +46,7 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
       const currentPrice =
         buyingOption.price?.entity?.priceToPay?.moneyValueOrRange?.value?.amount;
 
-      // Validar preços obrigatórios
       if (!currentPrice || currentPrice <= 0) {
-        /* console.warn('Skipping product: invalid current price'); */
         continue;
       }
 
@@ -66,14 +59,12 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
         continue;
       }
 
-      // Validar campos obrigatórios
       const asin = productEntity.asin;
       const title = productEntity.title?.entity?.displayString;
       const brand = productEntity.brandLogo?.entity?.logo?.entity?.altText;
       const imageId = productEntity.productImages?.entity?.images?.[0]?.lowRes?.physicalId;
 
       if (!asin || !title) {
-        /* console.warn('Skipping product: missing asin or title'); */
         continue;
       }
 
@@ -96,7 +87,6 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
       });
     } catch (error: any) {
       console.warn('Error parsing product:', error.message);
-      // Continua para o próximo produto sem quebrar o loop
       continue;
     }
   }
@@ -108,13 +98,12 @@ export const scrapAmazon = async () => {
   let browser;
 
   try {
-    // 1. Scraping com Playwright (Evita bloqueios básicos)
     browser = await chromium.launch({ headless: true });
 
     const context = await browser.newContext({
       userAgent:
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      viewport: { width: 1920, height: 1080 }, // Janela grande para carregar mais produtos
+      viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 1,
     });
 
@@ -137,8 +126,8 @@ export const scrapAmazon = async () => {
     });
 
     await page.goto('https://www.amazon.es/deals?language=pt_PT', {
-      waitUntil: 'domcontentloaded', // Muito mais rápido e menos propenso a timeouts
-      timeout: 60000, // Aumenta para 60 segundos por segurança
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
     });
 
     const departmentsContainer = page.locator('[data-tabulation-id="desktop-refinements"]');
@@ -191,7 +180,6 @@ export const scrapAmazon = async () => {
   } catch (error: any) {
     console.error('Fatal error during scraping:', error);
 
-    // Garantir que o browser é fechado mesmo em caso de erro
     if (browser) {
       try {
         await browser.close();
@@ -200,7 +188,6 @@ export const scrapAmazon = async () => {
       }
     }
 
-    // Retornar array vazio em caso de erro fatal
     return [];
   }
 };

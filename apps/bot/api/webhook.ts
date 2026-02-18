@@ -21,24 +21,19 @@ export default async function handler(
 
   res.status(200).send("OK")
 
-  const messages = await handleMessage(update.message)
   const chatId = update.message.chat.id;
+  const messages = await handleMessage(update.message)
 
-  console.log(`📤 Sending ${messages.length} message(s) to chat ${chatId}`);
+  await sendTelegramMessage(chatId, "Processando sua mensagem... ⏳");
 
-  // Enviar cada mensagem
   for (const msg of messages) {
     if (msg.imageUrl) {
-      // Enviar mensagem com imagem
       await sendTelegramPhoto(chatId, msg.imageUrl, msg.text);
     } else {
-      // Enviar mensagem de texto
       await sendTelegramMessage(chatId, msg.text);
     }
     
     // Pequeno delay entre mensagens para evitar rate limiting
     await new Promise(resolve => setTimeout(resolve, 300));
   }
-
-  return res.status(200).send("OK")
 }

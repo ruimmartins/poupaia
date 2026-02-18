@@ -34,18 +34,10 @@ export interface ProductMessage {
   imageUrl?: string;
 }
 
-/**
- * Processa mensagem do utilizador e identifica tipo + extrai filtros
- */
 export async function processUserMessage(systemInstruction: string, userMessage: string): Promise<ProcessedMessage> {
   try {
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
-
-    /* const url: string = `https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`
-    const response = await fetch(url)
-
-    console.log(await response.json()) */
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-flash-latest',
@@ -56,7 +48,6 @@ export async function processUserMessage(systemInstruction: string, userMessage:
     const response = result.response;
     const text = response.text();
 
-    // Extrair JSON da resposta
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('Formato de resposta inválido do Gemini');
@@ -64,7 +55,6 @@ export async function processUserMessage(systemInstruction: string, userMessage:
 
     const parsed: GeminiResponse = JSON.parse(jsonMatch[0]);
 
-    // Se não for relevante para compras
     if (!parsed.isRelevant || !parsed.messageType) {
       return {
         type: 'irrelevant',
@@ -72,12 +62,10 @@ export async function processUserMessage(systemInstruction: string, userMessage:
       };
     }
 
-    // Validar que parsed.filters existe
     if (!parsed.filters) {
       parsed.filters = {};
     }
 
-    // Construir filtros
     const filters: ProductFilters = {
       notExpired: true,
       limit: parsed.messageType === 'search' ? 10 : undefined,
@@ -105,7 +93,6 @@ export async function processUserMessage(systemInstruction: string, userMessage:
       };
     }
 
-    // Se for ELIMINAR ALERTA
     if (parsed.messageType === 'delete_alert') {
       const deleteAlertData = {
         categories: parsed.filters?.categories || [],
@@ -119,7 +106,6 @@ export async function processUserMessage(systemInstruction: string, userMessage:
       };
     }
 
-    // Se for uma PESQUISA
     return {
       type: 'search',
       filters,
@@ -129,7 +115,6 @@ export async function processUserMessage(systemInstruction: string, userMessage:
   } catch (error) {
     console.error('Erro ao processar mensagem com Gemini:', error);
     
-    // Fallback: assume pesquisa
     return {
       type: 'search',
       filters: {
@@ -144,10 +129,6 @@ export async function processUserMessage(systemInstruction: string, userMessage:
   } 
 }
 
-/**
- * Formata produtos para enviar ao utilizador
- * Retorna um array de mensagens, uma por produto (máximo 5)
- */
 export function formatProductsForUser(products: Product[]): ProductMessage[] {
   if (products.length === 0) {
     return [{
@@ -157,16 +138,11 @@ export function formatProductsForUser(products: Product[]): ProductMessage[] {
 
   const messages: ProductMessage[] = [];
   
-  // Mensagem inicial
   messages.push({
     text: `🎉 Encontrei ${products.length} produto(s) para ti!`
   });
-
-  // Limitar a 5 produtos
-  const productsToShow = products.slice(0, 5);
   
-  for (const product of productsToShow) {
-    // Garantir que preços são números
+  for (const product of products) {
     const currentPrice = typeof product.currentPrice === 'string' 
       ? parseFloat(product.currentPrice) 
       : product.currentPrice ?? 0;
@@ -175,7 +151,6 @@ export function formatProductsForUser(products: Product[]): ProductMessage[] {
       ? parseFloat(product.originalPrice) 
       : product.originalPrice ?? 0;
     
-    // Calcular desconto se não existir
     let discount = product.discountPercentage;
     if (discount === null && originalPrice && currentPrice < originalPrice) {
       discount = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
@@ -185,7 +160,6 @@ export function formatProductsForUser(products: Product[]): ProductMessage[] {
     
     let message = `${emoji} **${product.title}**\n\n`;
     
-    // Formatar preço com desconto
     if (discount && originalPrice) {
       message += `💶 ~~${originalPrice.toFixed(2)}€~~ → **${currentPrice.toFixed(2)}€** (-${discount}%)\n`;
     } else {
@@ -207,13 +181,6 @@ export function formatProductsForUser(products: Product[]): ProductMessage[] {
     messages.push({
       text: message,
       imageUrl: product.imageUrl
-    });
-  }
-  
-  // Mensagem final se houver mais produtos
-  if (products.length > 5) {
-    messages.push({
-      text: `... e mais ${products.length - 5} produto(s)! Refina a tua pesquisa para ver mais.`
     });
   }
 
