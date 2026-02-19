@@ -4,8 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "turbo run build",
-    "postbuild": "node scripts/prepare-vercel.js",
+    "build": "pnpm -r --filter=@poupaia/* run build",
     "scraper": "ts-node apps/scraper/src/index.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -13,7 +12,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.29.3",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -22,7 +20,6 @@
   "devDependencies": {
     "@types/node": "^25.2.3",
     "ts-node": "^10.9.2",
-    "turbo": "^2.8.10",
     "typescript": "^5.9.3"
   }
 }
