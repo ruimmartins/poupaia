@@ -1,9 +1,11 @@
 {
-  "buildCommand": "bash build.sh",
+  "buildCommand": "pnpm run build",
   "outputDirectory": ".",
+  "installCommand": "pnpm install",
   "functions": {
     "api/webhook.ts": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "packages/*/dist/**"
     }
   }
 }
