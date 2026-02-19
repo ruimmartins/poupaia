@@ -1,15 +1,5 @@
 {
   "extends": "./tsconfig.base.json",
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@poupaia/db/*": ["packages/db/src/*"],
-      "@poupaia/utils/*": ["packages/utils/src/*"],
-      "@poupaia/mocks/*": ["packages/mocks/src/*"],
-      "@poupaia/ai/*": ["packages/ai/src/*"],
-      "@poupaia/messaging/*": ["packages/messaging/src/*"]
-    }
-  },
-  "include": ["apps/**/*", "packages/**/*"],
+  "include": ["apps/**/*", "packages/**/*", "api/**/*"],
   "exclude": ["node_modules", "dist"]
 }
