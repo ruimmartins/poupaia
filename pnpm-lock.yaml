@@ -29,24 +29,25 @@ importers:
       '@poupaia/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging
+      dotenv:
+        specifier: ^17.3.1
+        version: 17.3.1
+    devDependencies:
       '@types/node':
         specifier: ^25.2.3
         version: 25.2.3
       '@vercel/node':
         specifier: ^5.6.3
         version: 5.6.3
-      dotenv:
-        specifier: ^17.3.1
-        version: 17.3.1
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   apps/scraper:
     dependencies:
       '@poupaia/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@poupaia/mocks':
-        specifier: workspace:*
-        version: link:../../packages/mocks
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
@@ -68,12 +69,6 @@ importers:
 
   packages/db:
     dependencies:
-      dotenv:
-        specifier: ^17.3.1
-        version: 17.3.1
-      mongo:
-        specifier: ^0.1.0
-        version: 0.1.0
       mongodb:
         specifier: ^7.1.0
         version: 7.1.0
@@ -708,10 +703,6 @@ packages:
     resolution: {integrity: sha512-vVqVZQyf3WLx2Shd0qJ9xuvqgAyKPLAiqITEtqW0oIUjzo3PePDd6fW9iFz30ef7Ysp/oiWqbhszeGWW2T6Gzw==}
     engines: {node: '>=10'}
     hasBin: true
-
-  mongo@0.1.0:
-    resolution: {integrity: sha512-2MPq+GCNKhah0V/g/HIQI/S1h6Ycd87KPuXAITkeXWT6wncvABFxOaXdzCKlRvLSQRUkDimllrRrhoHUTD8usg==}
-    engines: {node: '>= 0.4.0'}
 
   mongodb-connection-string-url@7.0.1:
     resolution: {integrity: sha512-h0AZ9A7IDVwwHyMxmdMXKy+9oNlF0zFoahHiX3vQ8e3KFcSP3VmsmfvtRSuLPxmyv2vjIDxqty8smTgie/SNRQ==}
@@ -1551,18 +1542,6 @@ snapshots:
       minipass: 7.1.2
 
   mkdirp@1.0.4: {}
-
-  mongo@0.1.0:
-    dependencies:
-      mongodb: 7.1.0
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-providers'
-      - '@mongodb-js/zstd'
-      - gcp-metadata
-      - kerberos
-      - mongodb-client-encryption
-      - snappy
-      - socks
 
   mongodb-connection-string-url@7.0.1:
     dependencies:

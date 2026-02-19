@@ -11,8 +11,6 @@
   "license": "ISC",
   "packageManager": "pnpm@10.29.3",
   "dependencies": {
-    "dotenv": "^17.3.1",
-    "mongo": "^0.1.0",
     "mongodb": "^7.1.0"
   },
   "devDependencies": {
