@@ -5,10 +5,10 @@ const PROMOTIONS_REGEX = /\/api\/marketplaces\/.*\/promotions/;
 
 const randomTimeout = (value: number) => (Math.random() + 0.5) * value;
 
-const clickWithRandomDelay = async (element: Locator, baseDelay: number = 1000) => {
+const clickLikeHuman = async (element: Locator) => {
+  await new Promise(resolve => setTimeout(resolve, randomTimeout(300)));
   await element.click();
-  await new Promise(resolve => setTimeout(resolve, baseDelay + randomTimeout(baseDelay)));
-}
+};
 
 const autoScroll = async (page: Page, times: number = 5, intervalMs: number = 1000) => {
   for (let i = 0; i < times; i++) {
@@ -113,23 +113,22 @@ export const scrapAmazon = async () => {
       deviceScaleFactor: 1,
     });
 
-    let currentCategory: string | null = null;
-    let currentSubcategory: string | null = null;
-
     const products: Product[] = [];
     const page = await context.newPage();
 
-    page.on('response', async response => {
-      if (PROMOTIONS_REGEX.test(response.url()) && currentCategory && currentSubcategory) {
-        try {
-          const data = await response.json();
-          const results = parseProductData(data, `${currentCategory} > ${currentSubcategory}`);
-          products.push(...results);
-        } catch (error: any) {
-          console.warn(`Failed to parse response from ${response.url()}:`, error.message);
+    const createResponseListener = (category: string, subcategory: string) => {
+      return async (response: any) => {
+        if (PROMOTIONS_REGEX.test(response.url())) {
+          try {
+            const data = await response.json();
+            const results = parseProductData(data, `${category} > ${subcategory}`);
+            products.push(...results);
+          } catch (error: any) {
+            console.warn(`Failed to parse response from ${response.url()}:`, error.message);
+          }
         }
-      }
-    });
+      };
+    };
 
     await page.goto('https://www.amazon.es/deals?language=pt_PT', {
       waitUntil: 'domcontentloaded',
@@ -138,41 +137,53 @@ export const scrapAmazon = async () => {
 
     const departmentsContainer = page.locator('[data-tabulation-id="desktop-refinements"]');
 
-    await departmentsContainer.locator('div:first-child a', { hasText: 'Ver mais' }).click();
-    await page.waitForTimeout(randomTimeout(1000));
+    const seeMoreButton = departmentsContainer.locator('div:first-child a', { hasText: 'Ver mais' });
+    await seeMoreButton.waitFor({ state: 'visible', timeout: 5000 });
+    await clickLikeHuman(seeMoreButton);
+    await page.waitForTimeout(randomTimeout(800));
 
-    const mainDepartments = (
-      await departmentsContainer
-        .locator('div:first-child [role="radiogroup"] [data-testid^="filter-departments-"]')
-        .all()
-    ).slice(0, -1);
+    const mainDepartmentsLocator = departmentsContainer
+      .locator('div:first-child [role="radiogroup"] [data-testid^="filter-departments-"]');
+    await mainDepartmentsLocator.first().waitFor({ state: 'visible', timeout: 3000 });
+    const mainDepartments = (await mainDepartmentsLocator.all()).slice(0, -1);
 
     for (const filter of mainDepartments.slice(1)) {
-      currentCategory = await filter.innerText();
-      await clickWithRandomDelay(filter);
+      const categoryName = await filter.innerText();
+      await clickLikeHuman(filter);
+      await page.waitForLoadState('networkidle', { timeout: 7000 });
 
-      const subDepartments = await departmentsContainer
-        .locator('div:nth-child(2) [role="radiogroup"] [data-testid^="filter-departments-"]')
-        .all();
+      const subDepartmentsLocator = departmentsContainer
+        .locator('div:nth-child(2) [role="radiogroup"] [data-testid^="filter-departments-"]');
+      await subDepartmentsLocator.first().waitFor({ state: 'visible', timeout: 3000 });
+      const subDepartments = await subDepartmentsLocator.all();
 
       for (const subFilter of subDepartments.slice(1)) {
-        currentSubcategory = await subFilter.innerText();
-        await clickWithRandomDelay(subFilter);
+        const subcategoryName = await subFilter.innerText();
+        
+        const responseListener = createResponseListener(categoryName, subcategoryName);
+        page.on('response', responseListener);
+        
+        await clickLikeHuman(subFilter);
+        await page.waitForLoadState('networkidle', { timeout: 7000 });
         await autoScroll(page, 10, 500);
-        await clickWithRandomDelay(
-          departmentsContainer.getByRole('button', { name: currentCategory, exact: true }).first()
-        );
+        await page.waitForLoadState('networkidle', { timeout: 7000 });
+        
+        page.off('response', responseListener);
+        
+        const categoryButton = departmentsContainer.getByRole('button', { name: categoryName, exact: true }).first();
+        await categoryButton.waitFor({ state: 'visible', timeout: 3000 });
+        await clickLikeHuman(categoryButton);
       }
 
       try {
-        await clickWithRandomDelay(
-          departmentsContainer.getByTestId('breadcrumb').getByRole('button').first()
-        );
+        const breadcrumbButton = departmentsContainer.getByTestId('breadcrumb').getByRole('button').first();
+        await breadcrumbButton.waitFor({ state: 'visible', timeout: 3000 });
+        await clickLikeHuman(breadcrumbButton);
       } catch (e) {
-        await clickWithRandomDelay(page.locator('[data-testid="filter-departments-all"]'));
+        const allDepartmentsButton = page.locator('[data-testid="filter-departments-all"]');
+        await allDepartmentsButton.waitFor({ state: 'visible', timeout: 3000 });
+        await clickLikeHuman(allDepartmentsButton);
       }
-
-      currentSubcategory = null;
     }
 
     await browser.close();
