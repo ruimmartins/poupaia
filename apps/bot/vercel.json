@@ -1,5 +1,6 @@
 {
-  "installCommand": "cd ../.. && pnpm install",
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "cd ../.. && pnpm --filter @poupaia/db build && pnpm --filter @poupaia/messaging build && pnpm --filter @poupaia/ai build",
   "functions": {
     "api/**/*.ts": {
       "maxDuration": 30

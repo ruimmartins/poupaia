@@ -66,6 +66,13 @@ importers:
       '@poupaia/db':
         specifier: workspace:*
         version: link:../db
+    devDependencies:
+      '@types/node':
+        specifier: ^25.2.3
+        version: 25.2.3
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/db:
     dependencies:
@@ -80,7 +87,14 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/messaging: {}
+  packages/messaging:
+    devDependencies:
+      '@types/node':
+        specifier: ^25.2.3
+        version: 25.2.3
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/mocks: {}
 

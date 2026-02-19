@@ -11,9 +11,11 @@
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "@poupaia/db/*": ["packages/db/src/*"],
-      "@poupaia/utils/*": ["packages/utils/src/*"],
-      "@poupaia/mocks/*": ["packages/mocks/src/*"]
+      "@poupaia/ai": ["packages/ai/src/index.ts"],
+      "@poupaia/db": ["packages/db/src/index.ts"],
+      "@poupaia/messaging": ["packages/messaging/src/index.ts"],
+      "@poupaia/utils": ["packages/utils/src/index.ts"],
+      "@poupaia/mocks": ["packages/mocks/index.ts"]
     }
   }
 }
