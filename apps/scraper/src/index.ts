@@ -11,7 +11,7 @@ if (existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }
 
-async function main() {
+const main = async () => {
   const startTime = Date.now();
   
   const tasks = new Listr([

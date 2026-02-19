@@ -3,11 +3,11 @@ import {
   formatProductsForUser,
   getSystemPrompt,
   ProductMessage,
+  IntentType,
 } from '@poupaia/ai';
 import {
   closeConnection,
   connectToDatabase,
-  findProductsForUser,
   searchProducts,
   getAllCategories,
 } from '@poupaia/db';
@@ -22,24 +22,17 @@ export const handleMessage = async (message: any): Promise<ProductMessage[]> => 
 
     const intent = await processUserMessage(SYSTEM_INSTRUCTIONS, userMessage);
 
-    if (intent.type === 'irrelevant') {
-      return [{ text: intent.responseMessage }];
-    } else if (intent.type === 'delete_alert') {
-      return [
-        {
-          text: 'Funcionalidade de deletar alertas ainda não implementada. Fica atento às próximas atualizações! 🚀',
-        },
-      ];
-    } else if (intent.type === 'alert') {
-      const products = await findProductsForUser(db, intent.filters);
-      return formatProductsForUser(products);
-    } else if (intent.type === 'search') {
-      const db = await connectToDatabase();
+    switch (intent.type) {
+      case IntentType.IRRELEVANT:
+        return [{ text: intent.responseMessage }];
 
-      let products;
+      case IntentType.DELETE_ALERT:
+        return [{ text: 'Funcionalidade de deletar alertas ainda não implementada. Fica atento às próximas atualizações! 🚀' }];
 
-      if (intent.filters?.searchQuery) {
-        products = await searchProducts(db, intent.filters.searchQuery, {
+      case IntentType.ALERT:
+      case IntentType.SEARCH: {
+        if (!intent.filters) intent.filters = {};
+        const products = await searchProducts(db, intent.filters.searchQuery || '', {
           categories: intent.filters.categories,
           keywordGroups: intent.filters.keywordGroups,
           minPrice: intent.filters.minPrice,
@@ -49,11 +42,8 @@ export const handleMessage = async (message: any): Promise<ProductMessage[]> => 
           onlyGoodDeals: intent.filters.onlyGoodDeals,
           limit: intent.filters.limit,
         });
-      } else {
-        products = await findProductsForUser(db, intent.filters);
+        return formatProductsForUser(products);
       }
-
-      return formatProductsForUser(products);
     }
   } catch (error) {
     console.error('Error processing message:', error);

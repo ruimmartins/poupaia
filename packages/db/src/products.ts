@@ -57,109 +57,11 @@ export const deleteExpiredProducts = async (db: Db) => {
   });
 };
 
-export async function findProductsForUser(
-  db: Db,
-  filters: ProductFilters = {}
-): Promise<Product[]> {
-  const collection = await getProductsCollection(db);
-
-  const andConditions: any[] = [];
-
-  const mongoFilter: Filter<Product> = {};
-
-  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
-    mongoFilter.currentPrice = {};
-    if (filters.minPrice !== undefined) {
-      mongoFilter.currentPrice.$gte = filters.minPrice;
-    }
-    if (filters.maxPrice !== undefined) {
-      mongoFilter.currentPrice.$lte = filters.maxPrice;
-    }
-  }
-
-  if (filters.minDiscount !== undefined) {
-    mongoFilter.discountPercentage = { $gte: filters.minDiscount };
-  }
-
-  if (filters.categories && filters.categories.length > 0) {
-    mongoFilter.category = { $in: filters.categories };
-  }
-
-  if (filters.keywords && filters.keywords.length > 0) {
-    andConditions.push({
-      $and: filters.keywords.map(keyword => ({
-        title: { $regex: escapeRegex(keyword), $options: 'i' },
-      })),
-    });
-  }
-
-  if (filters.keywordGroups && filters.keywordGroups.length > 0) {
-    const needsBoundary = ['men', 'man', 'boy', 'girl', 'kid', 'baby', 'women', 'woman'];
-
-    filters.keywordGroups.forEach(group => {
-      if (group.length > 0) {
-        andConditions.push({
-          $or: group.map(keyword => {
-            const useBoundary = needsBoundary.includes(keyword.toLowerCase());
-            const pattern = useBoundary ? `\\b${escapeRegex(keyword)}\\b` : escapeRegex(keyword);
-
-            return {
-              title: { $regex: pattern, $options: 'i' },
-            };
-          }),
-        });
-      }
-    });
-  }
-
-  if (filters.hasExpiration) {
-    mongoFilter.expiresAt = { $ne: null };
-  }
-
-  if (filters.notExpired) {
-    andConditions.push({
-      $or: [{ expiresAt: null }, { expiresAt: { $gte: new Date().toISOString() } }],
-    });
-  }
-
-  const sort: Record<string, 1 | -1> = {};
-  if (filters.sortBy) {
-    const sortField =
-      filters.sortBy === 'dealScore'
-        ? 'aiAnalysis.dealScore'
-        : filters.sortBy === 'price'
-          ? 'currentPrice'
-          : filters.sortBy;
-
-    sort[sortField] = filters.sortOrder === 'asc' ? 1 : -1;
-  } else {
-    sort.createdAt = -1;
-  }
-
-  if (andConditions.length > 0) {
-    mongoFilter.$and = andConditions;
-  }
-
-  let query = collection.find(mongoFilter).sort(sort);
-
-  if (filters.skip !== undefined) {
-    query = query.skip(filters.skip);
-  }
-
-  if (filters.limit !== undefined) {
-    query = query.limit(filters.limit);
-  } else {
-    query = query.limit(50);
-  }
-
-  return await query.toArray();
-}
-
-export async function searchProducts(
+export const searchProducts = async (
   db: Db,
   searchQuery: string,
   filters: Partial<ProductFilters> = {}
-): Promise<Product[]> {
+): Promise<Product[]> => {
   const collection = await getProductsCollection(db);
 
   const query: any = {

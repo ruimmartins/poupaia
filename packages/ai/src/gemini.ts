@@ -1,40 +1,8 @@
-import { connectToDatabase, getAllCategories, Product, ProductFilters } from '@poupaia/db';
+import { Product, ProductFilters } from '@poupaia/db';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { getSystemPrompt } from './system-prompt';
+import { AIResponse, IntentType, ProcessedMessage, ProductMessage } from './types';
 
-interface GeminiResponse {
-  isRelevant: boolean;
-  messageType?: 'alert' | 'search' | 'delete_alert';
-  filters?: any;
-  alertFrequency?: 'once' | 'always';
-  userMessage?: string;
-}
-
-export interface ProcessedMessage {
-  type: 'irrelevant' | 'alert' | 'search' | 'delete_alert';
-  filters?: ProductFilters;
-  alertData?: {
-    frequency: 'once' | 'always';
-    criteria: {
-      categories?: string[];
-      keywordGroups?: string[][];
-      maxPrice?: number;
-      minDiscountPercent?: number;
-    };
-  };
-  deleteAlertData?: {
-    categories?: string[];
-    keywordGroups?: string[][];
-  };
-  responseMessage: string;
-}
-
-export interface ProductMessage {
-  text: string;
-  imageUrl?: string;
-}
-
-export async function processUserMessage(systemInstruction: string, userMessage: string): Promise<ProcessedMessage> {
+export const processUserMessage = async (systemInstruction: string, userMessage: string): Promise<ProcessedMessage> => {
   try {
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
@@ -53,11 +21,11 @@ export async function processUserMessage(systemInstruction: string, userMessage:
       throw new Error('Formato de resposta inválido do Gemini');
     }
 
-    const parsed: GeminiResponse = JSON.parse(jsonMatch[0]);
+    const parsed: AIResponse = JSON.parse(jsonMatch[0]);
 
     if (!parsed.isRelevant || !parsed.messageType) {
       return {
-        type: 'irrelevant',
+        type: IntentType.IRRELEVANT,
         responseMessage: 'Desculpa, só posso ajudar-te a encontrar produtos e ofertas! 🛍️'
       };
     }
@@ -68,13 +36,13 @@ export async function processUserMessage(systemInstruction: string, userMessage:
 
     const filters: ProductFilters = {
       notExpired: true,
-      limit: parsed.messageType === 'search' ? 10 : undefined,
+      limit: parsed.messageType === IntentType.SEARCH ? 10 : undefined,
       sortBy: 'createdAt',
       sortOrder: 'desc',
       ...parsed.filters,
     };
 
-    if (parsed.messageType === 'alert') {
+    if (parsed.messageType === IntentType.ALERT) {
       const alertData = {
         frequency: parsed.alertFrequency || 'always',
         criteria: {
@@ -86,28 +54,28 @@ export async function processUserMessage(systemInstruction: string, userMessage:
       };
 
       return {
-        type: 'alert',
+        type: IntentType.ALERT,
         filters,
         alertData,
         responseMessage: parsed.userMessage || '✅ Alerta criado! Vou avisar-te quando encontrar algo.'
       };
     }
 
-    if (parsed.messageType === 'delete_alert') {
+    if (parsed.messageType === IntentType.DELETE_ALERT) {
       const deleteAlertData = {
         categories: parsed.filters?.categories || [],
         keywordGroups: parsed.filters?.keywordGroups,
       };
 
       return {
-        type: 'delete_alert',
+        type: IntentType.DELETE_ALERT,
         deleteAlertData,
         responseMessage: parsed.userMessage || '✅ Alerta removido!'
       };
     }
 
     return {
-      type: 'search',
+      type: IntentType.SEARCH,
       filters,
       responseMessage: parsed.userMessage || 'A procurar produtos... 🔍'
     };
@@ -116,7 +84,7 @@ export async function processUserMessage(systemInstruction: string, userMessage:
     console.error('Erro ao processar mensagem com Gemini:', error);
     
     return {
-      type: 'search',
+      type: IntentType.SEARCH,
       filters: {
         onlyGoodDeals: true,
         notExpired: true,
@@ -129,7 +97,7 @@ export async function processUserMessage(systemInstruction: string, userMessage:
   } 
 }
 
-export function formatProductsForUser(products: Product[]): ProductMessage[] {
+export const formatProductsForUser = (products: Product[]): ProductMessage[] => {
   if (products.length === 0) {
     return [{
       text: '😔 Não encontrei produtos com esses critérios. Tenta ser menos específico!'

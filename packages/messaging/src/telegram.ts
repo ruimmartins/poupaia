@@ -1,7 +1,7 @@
-export async function sendTelegramMessage(
+export const sendTelegramMessage = async (
   chatId: string,
   text: string
-) {
+) => {
   await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`, {
     method: "POST",
     headers: {
@@ -15,11 +15,11 @@ export async function sendTelegramMessage(
   })
 }
 
-export async function sendTelegramPhoto(
+export const sendTelegramPhoto = async (
   chatId: string,
   photoUrl: string,
   caption?: string
-) {
+) => {
   await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendPhoto`, {
     method: "POST",
     headers: {

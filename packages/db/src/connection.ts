@@ -4,7 +4,7 @@ let client: MongoClient | null = null;
 let db: Db | null = null;
 let isConnected = false;
 
-function getMongoClient(): MongoClient {
+const getMongoClient = (): MongoClient => {
   if (!client) {
     const uri = process.env.MONGODB_URI;
     
@@ -18,7 +18,7 @@ function getMongoClient(): MongoClient {
   return client;
 }
 
-export async function connectToDatabase(): Promise<Db> {
+export const connectToDatabase = async (): Promise<Db> => {
   if (isConnected && db) {
     return db;
   }
@@ -39,7 +39,7 @@ export async function connectToDatabase(): Promise<Db> {
   }
 }
 
-export async function closeConnection(): Promise<void> {
+export const closeConnection = async (): Promise<void> => {
   if (isConnected && client) {
     await client.close();
     isConnected = false;
@@ -49,7 +49,7 @@ export async function closeConnection(): Promise<void> {
   }
 }
 
-export function getDatabase(): Db {
+export const getDatabase = (): Db => {
   if (!db) {
     throw new Error('Database not connected. Call connectToDatabase() first.');
   }

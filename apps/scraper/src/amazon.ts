@@ -10,7 +10,7 @@ const clickWithRandomDelay = async (element: any, baseDelay: number = 1000) => {
   await new Promise(resolve => setTimeout(resolve, baseDelay + randomTimeout(baseDelay)));
 };
 
-async function autoScroll(page: Page, times: number = 5, intervalMs: number = 1000) {
+const autoScroll = async (page: Page, times: number = 5, intervalMs: number = 1000) => {
   for (let i = 0; i < times; i++) {
     const amountPxScrolled = Math.random() * 300 + 200;
     await page.evaluate(amount => {
