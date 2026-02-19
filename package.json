@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "turbo run build",
+    "postbuild": "node scripts/prepare-vercel.js",
     "scraper": "ts-node apps/scraper/src/index.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

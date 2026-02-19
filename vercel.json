@@ -4,8 +4,7 @@
   "installCommand": "pnpm install",
   "functions": {
     "api/webhook.ts": {
-      "maxDuration": 30,
-      "includeFiles": "packages/*/dist/**"
+      "maxDuration": 30
     }
   }
 }
