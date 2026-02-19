@@ -1,0 +1,8 @@
+{
+  "buildCommand": "pnpm --filter @poupaia/db build && pnpm --filter @poupaia/messaging build && pnpm --filter @poupaia/ai build",
+  "functions": {
+    "api/webhook.ts": {
+      "maxDuration": 30
+    }
+  }
+}
