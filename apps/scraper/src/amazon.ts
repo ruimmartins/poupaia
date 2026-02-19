@@ -1,14 +1,14 @@
-import { chromium, Page } from 'playwright';
+import { chromium, Locator, Page } from 'playwright';
 import { Product } from '@poupaia/db';
 
 const PROMOTIONS_REGEX = /\/api\/marketplaces\/.*\/promotions/;
 
 const randomTimeout = (value: number) => (Math.random() + 0.5) * value;
 
-const clickWithRandomDelay = async (element: any, baseDelay: number = 1000) => {
+const clickWithRandomDelay = async (element: Locator, baseDelay: number = 1000) => {
   await element.click();
   await new Promise(resolve => setTimeout(resolve, baseDelay + randomTimeout(baseDelay)));
-};
+}
 
 const autoScroll = async (page: Page, times: number = 5, intervalMs: number = 1000) => {
   for (let i = 0; i < times; i++) {
@@ -18,6 +18,12 @@ const autoScroll = async (page: Page, times: number = 5, intervalMs: number = 10
     }, amountPxScrolled);
 
     await page.waitForTimeout(randomTimeout(intervalMs));
+
+    const reachedBottom = await page.evaluate(
+      () => window.scrollY + window.innerHeight >= document.body.scrollHeight
+    );
+
+    if (reachedBottom) break;
   }
 }
 
