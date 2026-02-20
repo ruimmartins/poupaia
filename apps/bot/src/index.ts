@@ -16,14 +16,22 @@ app.post('/', async (req, res) => {
     }
 
     const chatId = update.message.chat.id;
+
+    console.log('Received update:', JSON.stringify(update));
+
+    await sendTelegramMessage(chatId, 'Processando sua mensagem... ⏳');
+
+    console.log("message sent to user, starting processing...");
     
     // Responder imediatamente ao Telegram para evitar timeout
     res.status(200).send('OK');
 
+    console.log("handleMessage will be called now...");
+
     // Processar mensagem em background
     const messages = await handleMessage(update.message);
 
-    await sendTelegramMessage(chatId, 'Processando sua mensagem... ⏳');
+    console.log("handleMessage has been called.");
 
     for (const msg of messages) {
       if (msg.imageUrl) {
@@ -34,6 +42,9 @@ app.post('/', async (req, res) => {
       // Pequeno delay para garantir ordem
       await new Promise(resolve => setTimeout(resolve, 300));
     }
+
+    console.log("all done");
+
   } catch (error) {
     console.error('Error processing webhook:', error);
     // Se ainda não respondeu (erro síncrono antes do res.send), responder agora
