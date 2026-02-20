@@ -12,12 +12,15 @@ export default async (req:any, res:any) => {
     return res.status(400).send("Bad Request")
   }
 
-  res.status(200).send("OK")
-
   const chatId = update.message.chat.id
-  const messages = await handleMessage(update.message)
 
   await sendTelegramMessage(chatId, "Processando sua mensagem... ⏳")
+
+  console.log("Received update:", JSON.stringify(update))
+
+  res.status(200).send("OK")
+
+  const messages = await handleMessage(update.message)
 
   for (const msg of messages) {
     if (msg.imageUrl) {
