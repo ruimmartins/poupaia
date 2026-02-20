@@ -25,7 +25,7 @@ const autoScroll = async (page: Page, times: number = 5, intervalMs: number = 10
 
     if (reachedBottom) break;
   }
-}
+};
 
 const parseProductData = (data: any, currentCategory: string): Product[] => {
   const result: Product[] = [];
@@ -42,15 +42,14 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
 
       const productEntity = product.product.entity;
       const buyingOption = productEntity.buyingOptions?.[0];
-      
+
       if (!buyingOption) {
         continue;
       }
 
       const originalPrice =
         buyingOption.price?.entity?.basisPrice?.moneyValueOrRange?.value?.amount;
-      const currentPrice =
-        buyingOption.price?.entity?.priceToPay?.moneyValueOrRange?.value?.amount;
+      const currentPrice = buyingOption.price?.entity?.priceToPay?.moneyValueOrRange?.value?.amount;
 
       if (!currentPrice || currentPrice <= 0) {
         continue;
@@ -76,7 +75,7 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
 
       result.push({
         id: `AMAZON_${asin}`,
-        imageUrl: imageId 
+        imageUrl: imageId
           ? `https://m.media-amazon.com/images/I/${imageId}._AC_SF226,226_QL85_.jpg`
           : 'https://via.placeholder.com/226',
         title,
@@ -120,6 +119,20 @@ export const scrapAmazon = async () => {
       return async (response: any) => {
         if (PROMOTIONS_REGEX.test(response.url())) {
           try {
+            
+            const status = response.status();
+            if (status === 204 || status >= 300) {
+              console.log(`Received status ${status} for ${response.url()}, skipping...`);
+              return;
+            }
+
+            
+            const contentType = response.headers()['content-type'];
+            if (!contentType.toLowerCase().includes('json')) {
+              console.log(`Unexpected content type ${contentType} for ${response.url()}, skipping...`);
+              return;
+            }
+
             const data = await response.json();
             const results = parseProductData(data, `${category} > ${subcategory}`);
             products.push(...results);
@@ -137,48 +150,60 @@ export const scrapAmazon = async () => {
 
     const departmentsContainer = page.locator('[data-tabulation-id="desktop-refinements"]');
 
-    const seeMoreButton = departmentsContainer.locator('div:first-child a', { hasText: 'Ver mais' });
+    const seeMoreButton = departmentsContainer.locator('div:first-child a', {
+      hasText: 'Ver mais',
+    });
     await seeMoreButton.waitFor({ state: 'visible', timeout: 5000 });
     await clickLikeHuman(seeMoreButton);
     await page.waitForTimeout(randomTimeout(800));
 
-    const mainDepartmentsLocator = departmentsContainer
-      .locator('div:first-child [role="radiogroup"] [data-testid^="filter-departments-"]');
+    const mainDepartmentsLocator = departmentsContainer.locator(
+      'div:first-child [role="radiogroup"] [data-testid^="filter-departments-"]'
+    );
     await mainDepartmentsLocator.first().waitFor({ state: 'visible', timeout: 3000 });
     const mainDepartments = (await mainDepartmentsLocator.all()).slice(0, -1);
 
-    for (const filter of mainDepartments.slice(2, 5)) {
+    for (const filter of mainDepartments.slice(1)) {
       const categoryName = await filter.innerText();
       await clickLikeHuman(filter);
       await page.waitForLoadState('networkidle', { timeout: 7000 });
 
       await page.waitForTimeout(1000);
 
-      const subDepartmentsLocator = departmentsContainer
-        .locator('div:nth-child(2) [role="radiogroup"] [data-testid^="filter-departments-"]');
+      const subDepartmentsLocator = departmentsContainer.locator(
+        'div:nth-child(2) [role="radiogroup"] [data-testid^="filter-departments-"]'
+      );
       await subDepartmentsLocator.first().waitFor({ state: 'visible', timeout: 3000 });
       const subDepartments = await subDepartmentsLocator.all();
 
       for (const subFilter of subDepartments.slice(1)) {
         const subcategoryName = await subFilter.innerText();
-        
+
         const responseListener = createResponseListener(categoryName, subcategoryName);
         page.on('response', responseListener);
-        
+
         await clickLikeHuman(subFilter);
         await page.waitForLoadState('networkidle', { timeout: 7000 });
+        await page.waitForTimeout(randomTimeout(300));
         await autoScroll(page, 10, 500);
         await page.waitForLoadState('networkidle', { timeout: 7000 });
-        
+        await page.waitForTimeout(randomTimeout(300));
+
         page.off('response', responseListener);
-        
-        const categoryButton = departmentsContainer.getByRole('button', { name: categoryName, exact: true }).first();
+
+        const categoryButton = departmentsContainer
+          .getByRole('button', { name: categoryName, exact: true })
+          .first();
         await categoryButton.waitFor({ state: 'visible', timeout: 3000 });
         await clickLikeHuman(categoryButton);
+        await page.waitForTimeout(randomTimeout(300));
       }
 
       try {
-        const breadcrumbButton = departmentsContainer.getByTestId('breadcrumb').getByRole('button').first();
+        const breadcrumbButton = departmentsContainer
+          .getByTestId('breadcrumb')
+          .getByRole('button')
+          .first();
         await breadcrumbButton.waitFor({ state: 'visible', timeout: 3000 });
         await clickLikeHuman(breadcrumbButton);
         await page.waitForTimeout(randomTimeout(800));

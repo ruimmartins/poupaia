@@ -1,8 +1,9 @@
-name: CI
+name: Scraper
 
 on:
   schedule:
-    - cron: '0 1 * * *'
+    - cron: '0 3 * * *'   # Às 4h UTC (5h PT)
+    - cron: '0 19 * * *'  # Às 20h UTC (21h PT)
   workflow_dispatch:
 
 jobs:
@@ -52,9 +53,6 @@ jobs:
       - name: Instalar Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm --filter scraper exec playwright install --with-deps chromium
-
-      - name: Build packages
-        run: pnpm run build
 
       - name: Executar scraper
         run: pnpm run scraper
