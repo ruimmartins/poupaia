@@ -9,15 +9,16 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "devDependencies": {
-    "@types/node": "^25.2.3",
-    "typescript": "^5.9.3"
+    "@types/node": "^25.2.3"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.29.3",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@poupaia/db": "workspace:*",
-    "@google/generative-ai": "^0.24.1"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }

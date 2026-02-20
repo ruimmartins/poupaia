@@ -3,10 +3,16 @@ import { Product } from '@poupaia/db';
 
 const PROMOTIONS_REGEX = /\/api\/marketplaces\/.*\/promotions/;
 
+const IS_CI = process.env.CI === 'true';
+const WAIT_FOR_CLICK_TIMEOUT = IS_CI ? 200 : 300;
+const WAIT_FOR_SELECTOR_TIMEOUT = IS_CI ? 8000 : 5000;
+const WAIT_FOR_NAVIGATION_TIMEOUT = IS_CI ? 12000 : 8000;
+const WAIT_FOR_NETWORK_IDLE_TIMEOUT = IS_CI ? 15000 : 10000;
+
 const randomTimeout = (value: number) => (Math.random() + 0.5) * value;
 
 const clickLikeHuman = async (element: Locator) => {
-  await new Promise(resolve => setTimeout(resolve, randomTimeout(300)));
+  await new Promise(resolve => setTimeout(resolve, randomTimeout(WAIT_FOR_CLICK_TIMEOUT)));
   await element.click();
 };
 
@@ -119,17 +125,17 @@ export const scrapAmazon = async () => {
       return async (response: any) => {
         if (PROMOTIONS_REGEX.test(response.url())) {
           try {
-            
             const status = response.status();
             if (status === 204 || status >= 300) {
               console.log(`Received status ${status} for ${response.url()}, skipping...`);
               return;
             }
 
-            
             const contentType = response.headers()['content-type'];
             if (!contentType.toLowerCase().includes('json')) {
-              console.log(`Unexpected content type ${contentType} for ${response.url()}, skipping...`);
+              console.log(
+                `Unexpected content type ${contentType} for ${response.url()}, skipping...`
+              );
               return;
             }
 
@@ -153,27 +159,32 @@ export const scrapAmazon = async () => {
     const seeMoreButton = departmentsContainer.locator('div:first-child a', {
       hasText: 'Ver mais',
     });
-    await seeMoreButton.waitFor({ state: 'visible', timeout: 5000 });
+    await seeMoreButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
     await clickLikeHuman(seeMoreButton);
-    await page.waitForTimeout(randomTimeout(800));
+    await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
 
     const mainDepartmentsLocator = departmentsContainer.locator(
       'div:first-child [role="radiogroup"] [data-testid^="filter-departments-"]'
     );
-    await mainDepartmentsLocator.first().waitFor({ state: 'visible', timeout: 3000 });
+    await mainDepartmentsLocator
+      .first()
+      .waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
     const mainDepartments = (await mainDepartmentsLocator.all()).slice(0, -1);
 
     for (const filter of mainDepartments.slice(1)) {
       const categoryName = await filter.innerText();
+      console.log(categoryName);
       await clickLikeHuman(filter);
-      await page.waitForLoadState('networkidle', { timeout: 7000 });
+      await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
 
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
 
       const subDepartmentsLocator = departmentsContainer.locator(
         'div:nth-child(2) [role="radiogroup"] [data-testid^="filter-departments-"]'
       );
-      await subDepartmentsLocator.first().waitFor({ state: 'visible', timeout: 3000 });
+      await subDepartmentsLocator
+        .first()
+        .waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
       const subDepartments = await subDepartmentsLocator.all();
 
       for (const subFilter of subDepartments.slice(1)) {
@@ -183,20 +194,20 @@ export const scrapAmazon = async () => {
         page.on('response', responseListener);
 
         await clickLikeHuman(subFilter);
-        await page.waitForLoadState('networkidle', { timeout: 7000 });
-        await page.waitForTimeout(randomTimeout(300));
+        await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+        await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
         await autoScroll(page, 10, 500);
-        await page.waitForLoadState('networkidle', { timeout: 7000 });
-        await page.waitForTimeout(randomTimeout(300));
+        await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+        await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
 
         page.off('response', responseListener);
 
         const categoryButton = departmentsContainer
           .getByRole('button', { name: categoryName, exact: true })
           .first();
-        await categoryButton.waitFor({ state: 'visible', timeout: 3000 });
+        await categoryButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
         await clickLikeHuman(categoryButton);
-        await page.waitForTimeout(randomTimeout(300));
+        await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
       }
 
       try {
@@ -204,14 +215,17 @@ export const scrapAmazon = async () => {
           .getByTestId('breadcrumb')
           .getByRole('button')
           .first();
-        await breadcrumbButton.waitFor({ state: 'visible', timeout: 3000 });
+        await breadcrumbButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
         await clickLikeHuman(breadcrumbButton);
-        await page.waitForTimeout(randomTimeout(800));
+        await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
       } catch (e) {
         const allDepartmentsButton = page.locator('[data-testid="filter-departments-all"]');
-        await allDepartmentsButton.waitFor({ state: 'visible', timeout: 3000 });
+        await allDepartmentsButton.waitFor({
+          state: 'visible',
+          timeout: WAIT_FOR_SELECTOR_TIMEOUT,
+        });
         await clickLikeHuman(allDepartmentsButton);
-        await page.waitForTimeout(randomTimeout(800));
+        await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
       }
     }
 

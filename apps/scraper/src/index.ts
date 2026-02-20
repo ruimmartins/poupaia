@@ -43,20 +43,7 @@ const main = async () => {
         
         task.title = `${result.upsertedCount} novos, ${result.modifiedCount} atualizados (${products.length} total)`;
       },
-    },
-    {
-      title: "A eliminar produtos expirados",
-      task: async (ctx, task) => {
-    
-        const result = await deleteExpiredProducts(ctx.db);
-        
-        if (result.deletedCount === 0) {
-          task.title = "Nenhum produto expirado";
-        } else {
-          task.title = `${result.deletedCount} produto(s) expirado(s) eliminado(s)`;
-        }
-      },
-    },
+    }
   ]);
 
   try {

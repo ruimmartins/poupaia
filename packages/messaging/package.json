@@ -13,7 +13,10 @@
   "license": "ISC",
   "packageManager": "pnpm@10.29.3",
   "devDependencies": {
-    "@types/node": "^25.2.3",
+    "@types/node": "^25.2.3"
+  },
+  "dependencies": {
+    "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }
 }
