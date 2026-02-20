@@ -8,7 +8,7 @@ COPY . /usr/src/app
 WORKDIR /usr/src/app
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm --filter bot... build
-RUN pnpm deploy --filter=bot --prod /prod/bot
+RUN pnpm deploy --filter=bot --prod /prod/bot --legacy
 
 FROM node:20-slim
 COPY --from=build /prod/bot /prod/bot
