@@ -147,10 +147,12 @@ export const scrapAmazon = async () => {
     await mainDepartmentsLocator.first().waitFor({ state: 'visible', timeout: 3000 });
     const mainDepartments = (await mainDepartmentsLocator.all()).slice(0, -1);
 
-    for (const filter of mainDepartments.slice(1)) {
+    for (const filter of mainDepartments.slice(2, 5)) {
       const categoryName = await filter.innerText();
       await clickLikeHuman(filter);
       await page.waitForLoadState('networkidle', { timeout: 7000 });
+
+      await page.waitForTimeout(1000);
 
       const subDepartmentsLocator = departmentsContainer
         .locator('div:nth-child(2) [role="radiogroup"] [data-testid^="filter-departments-"]');
@@ -179,10 +181,12 @@ export const scrapAmazon = async () => {
         const breadcrumbButton = departmentsContainer.getByTestId('breadcrumb').getByRole('button').first();
         await breadcrumbButton.waitFor({ state: 'visible', timeout: 3000 });
         await clickLikeHuman(breadcrumbButton);
+        await page.waitForTimeout(randomTimeout(800));
       } catch (e) {
         const allDepartmentsButton = page.locator('[data-testid="filter-departments-all"]');
         await allDepartmentsButton.waitFor({ state: 'visible', timeout: 3000 });
         await clickLikeHuman(allDepartmentsButton);
+        await page.waitForTimeout(randomTimeout(800));
       }
     }
 
