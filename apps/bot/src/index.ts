@@ -17,7 +17,7 @@ app.post('/', async (req, res) => {
 
     const chatId = update.message.chat.id;
 
-    console.log('Received update:', JSON.stringify(update));
+    console.log('Received update:', JSON.stringify(update, null, 2));
 
     await sendTelegramMessage(chatId, 'Processando sua mensagem... ⏳');
 

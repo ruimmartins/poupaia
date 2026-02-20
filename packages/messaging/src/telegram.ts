@@ -2,6 +2,7 @@ export const sendTelegramMessage = async (
   chatId: string,
   text: string
 ) => {
+  console.log("MESSAGE TELEGRAM TOKEN:", process.env.TELEGRAM_TOKEN);
   await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendMessage`, {
     method: "POST",
     headers: {
@@ -20,6 +21,7 @@ export const sendTelegramPhoto = async (
   photoUrl: string,
   caption?: string
 ) => {
+  console.log("PHOTO TELEGRAM TOKEN:", process.env.TELEGRAM_TOKEN);
   await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_TOKEN}/sendPhoto`, {
     method: "POST",
     headers: {

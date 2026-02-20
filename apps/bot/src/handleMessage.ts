@@ -22,7 +22,7 @@ export const handleMessage = async (message: any): Promise<ProductMessage[]> => 
 
     const intent = await processUserMessage(SYSTEM_INSTRUCTIONS, userMessage);
 
-    console.log('Processed intent:', intent);
+    console.log('Processed intent:', JSON.stringify(intent, null, 2));
 
     switch (intent.type) {
       case IntentType.IRRELEVANT:
