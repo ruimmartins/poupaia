@@ -1,8 +1,7 @@
-import type { VercelRequest, VercelResponse } from "@vercel/node"
 import { handleMessage } from "../src/handleMessage"
 import { sendTelegramMessage, sendTelegramPhoto } from "@poupaia/messaging"
 
-export default async (req: VercelRequest, res: VercelResponse) => {
+export default async (req:any, res:any) => {
   if (req.method !== "POST") {
     return res.status(405).send("Method not allowed")
   }
