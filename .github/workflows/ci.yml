@@ -53,5 +53,8 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm --filter scraper exec playwright install --with-deps chromium
 
+      - name: Build packages
+        run: pnpm run build
+
       - name: Executar scraper
         run: pnpm run scraper
