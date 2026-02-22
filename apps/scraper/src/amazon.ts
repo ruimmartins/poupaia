@@ -11,6 +11,15 @@ const WAIT_FOR_NETWORK_IDLE_TIMEOUT = IS_CI ? 7500 : 5000;
 
 const randomTimeout = (value: number) => (Math.random() + 0.5) * value;
 
+function getRandomUserAgent() {
+  const agents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+  ];
+  return agents[Math.floor(Math.random() * agents.length)];
+}
+
 const clickLikeHuman = async (element: Locator) => {
   await new Promise(resolve => setTimeout(resolve, randomTimeout(WAIT_FOR_CLICK_TIMEOUT)));
   await element.click();
@@ -109,17 +118,32 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
   let browser;
 
   try {
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-dev-shm-usage',
+        '--disable-infobars',
+        '--window-size=1366,768',
+      ],
+    });
 
     const context = await browser.newContext({
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      viewport: { width: 1920, height: 1080 },
-      deviceScaleFactor: 1,
+      viewport: { width: 1366, height: 768 },
+      locale: 'pt-PT',
+      timezoneId: 'Europe/Lisbon',
+      userAgent: getRandomUserAgent(),
     });
 
     const products: Product[] = [];
     const page = await context.newPage();
+
+    await page.setExtraHTTPHeaders({
+      'accept-language': 'pt-PT,pt;q=0.9,en;q=0.8',
+      'upgrade-insecure-requests': '1',
+    });
 
     const createResponseListener = (category: string, subcategory: string) => {
       return async (response: any) => {
@@ -172,8 +196,10 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
     const allMainDepartments = (await mainDepartmentsLocator.all()).slice(0, -1);
 
     // Dividir categorias entre tasks
-    const mainDepartments = allMainDepartments.slice(1).filter((_, index) => index % totalTasks === taskIndex);
-    
+    const mainDepartments = allMainDepartments
+      .slice(1)
+      .filter((_, index) => index % totalTasks === taskIndex);
+
     for (const filter of mainDepartments) {
       const categoryName = await filter.innerText();
       await clickLikeHuman(filter);
