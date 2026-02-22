@@ -1,10 +1,9 @@
 import { Listr } from "listr2";
-import { connectToDatabase, closeConnection, Product, deleteExpiredProducts, createOrUpdateProducts } from "@poupaia/db";
+import { connectToDatabase, closeConnection, Product, deleteInvalidProducts, createOrUpdateProducts, cleanUserSentProducts } from "@poupaia/db";
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { existsSync } from 'fs';
 
-// Carregar .env da pasta apps/scraper (apenas em desenvolvimento local)
 const envPath = path.resolve(__dirname, '../.env');
 if (existsSync(envPath)) {
   dotenv.config({ path: envPath });
@@ -22,15 +21,29 @@ const main = async () => {
       },
     },
     {
-      title: "A eliminar produtos expirados",
+      title: "A eliminar produtos inválidos",
       task: async (ctx, task) => {
     
-        const result = await deleteExpiredProducts(ctx.db);
+        const result = await deleteInvalidProducts(ctx.db);
         
         if (result.deletedCount === 0) {
           task.title = "Nenhum produto expirado";
         } else {
           task.title = `${result.deletedCount} produto(s) expirado(s) eliminado(s)`;
+        }
+      },
+    },
+    {
+      title: "A limpar IDs de produtos enviados órfãos...",
+      task: async (ctx, task) => {
+        const result = await cleanUserSentProducts(ctx.db);
+
+        if (result.usersChecked === 0) {
+          task.title = "Nenhum utilizador com produtos enviados";
+        } else if (result.idsRemoved === 0) {
+          task.title = `${result.usersChecked} utilizador(es) verificado(s), nenhum ID órfão`;
+        } else {
+          task.title = `${result.idsRemoved} ID(s) órfão(s) removido(s) de ${result.usersChecked} utilizador(es)`;
         }
       },
     },

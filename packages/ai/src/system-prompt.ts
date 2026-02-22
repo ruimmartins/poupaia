@@ -1,49 +1,70 @@
-export const getSystemPrompt = (categories: string[]) => {
-  return `Analisa mensagens de utilizadores e identifica produtos.
+import { Message } from '@poupaia/db';
 
-CATEGORIAS: ${categories.join(', ')}
+const formatMessageHistory = (messages: Message[]): string => {
+  if (messages.length === 0) return '';
+  
+  // Mostrar apenas últimas 3 mensagens, formato ultra-compacto
+  const history = messages
+    .slice(0, 3)
+    .reverse() // Ordem cronológica
+    .map(m => `${m.intentType}:"${m.text.substring(0, 40)}"`) // Limitar a 40 chars
+    .join(' | ');
+  
+  return `\nCONTEXTO: ${history}`;
+};
 
-TIPOS:
-- alert: "avisa-me", "notifica", "alerta"
-- search: "quero", "procuro", "mostra", "há"
-- delete_alert: "cancela", "não quero mais", "remove"
+export const getSystemPrompt = (
+  categories: string[], 
+  messageHistory: Message[] = [],
+  pendingAlertFilters?: {
+    searchQuery: string;
+    categories?: string[];
+    keywordGroups?: string[][];
+    minPrice?: number;
+    maxPrice?: number;
+    minDiscount?: number;
+  }
+) => {
+  const contextSection = formatMessageHistory(messageHistory);
+  const pendingAlertSection = pendingAlertFilters 
+    ? `\n\nALERTA PENDENTE: O utilizador acabou de fazer uma pesquisa sem resultados. Se ele responder "sim", "quero", "cria", "ok" ou similar, deve criar um alerta com estes filtros: ${JSON.stringify(pendingAlertFilters)}`
+    : '';
+  
+  return `Analisa mensagens e identifica produtos.${contextSection}${pendingAlertSection}
 
-RESPOSTA JSON:
+CAT: ${categories.join(', ')}
+
+TIPOS: alert ("avisa"), search ("quero","há"), delete_alert ("cancela")
+
+JSON:
 {
-  "isRelevant": true/false,
+  "isRelevant": bool,
   "messageType": "alert|search|delete_alert",
   "filters": {
-    "searchQuery": "OBRIGATÓRIO - query limpa sem palavras de ligação",
-    "categories": ["categoria"],
-    "keywordGroups": [["palavra1", "sinónimo"], ["palavra2"]],
-    "maxPrice": número,
-    "minDiscount": número
+    "searchQuery": "SEMPRE query limpa",
+    "categories": ["cat"],
+    "keywordGroups": [["pt","en"]],
+    "maxPrice": num,
+    "minDiscount": num
   },
-  "alertFrequency": "once|always",
-  "userMessage": "mensagem"
+  "userMessage": "msg"
 }
 
-REGRAS searchQuery:
-- SEMPRE obrigatório (nunca vazio)
-- Remover: "quero", "procuro", "mostra", "há", "me", "existe"
-- Manter: produto, marca, característica
-- Ex: "quero café em grão" → "café grão"
-- Ex: "há portáteis gaming?" → "portáteis gaming"
+searchQuery REGRAS:
+- OBRIGATÓRIO (nunca vazio)
+- Remove: "quero","há","me"
+- Ex: "quero café" → "café"
 
-keywordGroups (OBRIGATÓRIO para produtos específicos):
-- Incluir PT/ES/EN
-- Grupos = AND, dentro = OR
-- Ex: [["café","coffee"], ["grão","bean"]]
-- Ex: [["portátil","laptop","pc"]]
+keywordGroups:
+- PT/EN obrigatório
+- [[termo1,syn1],[termo2]]
+- Ex: [["café","coffee"]]
 
-EXEMPLOS:
+EX:
+"telemóveis" → {"isRelevant":true,"messageType":"search","filters":{"searchQuery":"telemóveis","keywordGroups":[["telemóvel","phone"]]},"userMessage":"A procurar..."}
 
-"telemóveis baratos" →
-{"isRelevant":true,"messageType":"search","filters":{"searchQuery":"telemóveis","categories":["Eletrónica"],"keywordGroups":[["telemóvel","smartphone","phone"]]},"userMessage":"A procurar..."}
+"avisa portáteis" → {"isRelevant":true,"messageType":"alert","filters":{"searchQuery":"portáteis","keywordGroups":[["portátil","laptop"]]},"userMessage":"Ok!"}
 
-"avisa computadores" →
-{"isRelevant":true,"messageType":"alert","filters":{"searchQuery":"computadores","categories":["Eletrónica"],"keywordGroups":[["computador","laptop","pc"]]},"alertFrequency":"always","userMessage":"Vou avisar!"}
-
-"sapatilhas homem 40€" →
-{"isRelevant":true,"messageType":"search","filters":{"searchQuery":"sapatilhas homem","categories":["Roupa, sapatos e malas"],"keywordGroups":[["sapatilhas","sneakers"],["homem","men"]],"maxPrice":40},"userMessage":"A procurar..."}`;
+"sapatilhas <40€" → {"isRelevant":true,"messageType":"search","filters":{"searchQuery":"sapatilhas","keywordGroups":[["sapatilhas","sneakers"]],"maxPrice":40},"userMessage":"A procurar..."}`
 };
+

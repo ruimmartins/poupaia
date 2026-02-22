@@ -31,26 +31,28 @@ export const createOrUpdateProducts = async (db: Db, products: Product[]) => {
   return await collection.bulkWrite(bulkOps);
 };
 
-export const deleteExpiredProducts = async (db: Db) => {
+export const deleteInvalidProducts = async (db: Db) => {
   const collection = await getProductsCollection(db);
 
   const now = new Date();
 
-  const eightDaysAgo = new Date();
-  eightDaysAgo.setDate(eightDaysAgo.getDate() - 8);
+  const twoDaysAgo = new Date();
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
 
   return await collection.deleteMany({
     $or: [
       {
-        expiresAt: {
-          $ne: null,
-          $lt: now.toISOString(),
-        },
+        currentPrice: { $eq: null } as any,
       },
       {
         expiresAt: null,
         createdAt: {
-          $lt: eightDaysAgo.toISOString(),
+          $lt: twoDaysAgo.toISOString(),
+        },
+      },
+      {
+        expiresAt: {
+          $lt: now.toISOString(),
         },
       },
     ],

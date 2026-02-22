@@ -44,7 +44,6 @@ export const processUserMessage = async (systemInstruction: string, userMessage:
 
     if (parsed.messageType === IntentType.ALERT) {
       const alertData = {
-        frequency: parsed.alertFrequency || 'always',
         criteria: {
           categories: parsed.filters?.categories || [],
           keywordGroups: parsed.filters?.keywordGroups,
@@ -95,62 +94,4 @@ export const processUserMessage = async (systemInstruction: string, userMessage:
       responseMessage: 'A mostrar-te as melhores ofertas disponíveis! 🎯'
     };
   } 
-}
-
-export const formatProductsForUser = (products: Product[]): ProductMessage[] => {
-  if (products.length === 0) {
-    return [{
-      text: '😔 Não encontrei produtos com esses critérios. Tenta ser menos específico!'
-    }];
-  }
-
-  const messages: ProductMessage[] = [];
-  
-  messages.push({
-    text: `🎉 Encontrei ${products.length} produto(s) para ti!`
-  });
-  
-  for (const product of products) {
-    const currentPrice = typeof product.currentPrice === 'string' 
-      ? parseFloat(product.currentPrice) 
-      : product.currentPrice ?? 0;
-    
-    const originalPrice = typeof product.originalPrice === 'string' 
-      ? parseFloat(product.originalPrice) 
-      : product.originalPrice ?? 0;
-    
-    let discount = product.discountPercentage;
-    if (discount === null && originalPrice && currentPrice < originalPrice) {
-      discount = Math.round(((originalPrice - currentPrice) / originalPrice) * 100);
-    }
-    
-    const emoji = discount >= 60 ? '🔥' : discount >= 40 ? '⚡' : '💰';
-    
-    let message = `${emoji} **${product.title}**\n\n`;
-    
-    if (discount && originalPrice) {
-      message += `💶 ~~${originalPrice.toFixed(2)}€~~ → **${currentPrice.toFixed(2)}€** (-${discount}%)\n`;
-    } else {
-      message += `💶 **${currentPrice.toFixed(2)}€**\n`;
-    }
-    
-    if (product.expiresAt) {
-      const expiryDate = new Date(product.expiresAt);
-      const now = new Date();
-      const hoursLeft = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60));
-      
-      if (hoursLeft < 24) {
-        message += `⏰ Expira em ${hoursLeft}h\n`;
-      }
-    }
-    
-    message += `\n🛒 ${product.url}`;
-    
-    messages.push({
-      text: message,
-      imageUrl: product.imageUrl
-    });
-  }
-
-  return messages;
 }

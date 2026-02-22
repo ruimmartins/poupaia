@@ -1,6 +1,6 @@
 import { Listr } from "listr2";
 import { scrapAmazon } from "./amazon";
-import { connectToDatabase, closeConnection, Product, deleteExpiredProducts, createOrUpdateProducts } from "@poupaia/db";
+import { connectToDatabase, closeConnection, Product, deleteInvalidProducts, createOrUpdateProducts } from "@poupaia/db";
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { existsSync } from 'fs';
@@ -13,6 +13,7 @@ if (existsSync(envPath)) {
 
 const main = async () => {
   const startTime = Date.now();
+  const PARALLEL_TASKS = 3; // Número de scrapers em paralelo
   
   const tasks = new Listr([
     {
@@ -23,10 +24,29 @@ const main = async () => {
       },
     },
     {
-      title: "Scraping Amazon...",
+      title: "Scraping Amazon em paralelo...",
       task: async (ctx, task) => {
-        ctx.products = await scrapAmazon();
-        task.title = `Scraping Amazon concluído: ${ctx.products.length} produtos encontrados`;
+        const scrapingTasks = Array.from({ length: PARALLEL_TASKS }, (_, index) => 
+          scrapAmazon(index, PARALLEL_TASKS)
+            .then(products => {
+              return products;
+            })
+            .catch(error => {
+              console.error(`[Task ${index}] Erro:`, error);
+              return [];
+            })
+        );
+
+        const results = await Promise.all(scrapingTasks);
+        
+        ctx.products = results.flat();
+        
+        const uniqueProducts = Array.from(
+          new Map(ctx.products.map((p: Product) => [p.id, p])).values()
+        );
+        ctx.products = uniqueProducts;
+        
+        task.title = `Scraping concluído: ${ctx.products.length} produtos únicos (${PARALLEL_TASKS} tasks em paralelo)`;
       },
     },
     {
@@ -50,8 +70,8 @@ const main = async () => {
     await tasks.run();
     
     const endTime = Date.now();
-    const executionTime = ((endTime - startTime) / 1000).toFixed(2);
-    console.log(`\n✓ Execução concluída em ${executionTime}s`);
+    const executionTime = ((endTime - startTime) / 1000 / 60).toFixed(2);
+    console.log(`\n✓ Execução concluída em ${executionTime} minutos`);
   } finally {
     await closeConnection();
   }

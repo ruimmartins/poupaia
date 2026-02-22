@@ -11,7 +11,6 @@ export interface AIResponse {
   isRelevant: boolean;
   messageType?: IntentType;
   filters?: any;
-  alertFrequency?: 'once' | 'always';
   userMessage?: string;
 }
 
@@ -19,7 +18,6 @@ export interface ProcessedMessage {
   type: IntentType;
   filters?: ProductFilters;
   alertData?: {
-    frequency: 'once' | 'always';
     criteria: {
       categories?: string[];
       keywordGroups?: string[][];

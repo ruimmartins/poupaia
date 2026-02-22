@@ -5,9 +5,9 @@ const PROMOTIONS_REGEX = /\/api\/marketplaces\/.*\/promotions/;
 
 const IS_CI = process.env.CI === 'true';
 const WAIT_FOR_CLICK_TIMEOUT = IS_CI ? 200 : 300;
-const WAIT_FOR_SELECTOR_TIMEOUT = IS_CI ? 8000 : 5000;
-const WAIT_FOR_NAVIGATION_TIMEOUT = IS_CI ? 12000 : 8000;
-const WAIT_FOR_NETWORK_IDLE_TIMEOUT = IS_CI ? 15000 : 10000;
+const WAIT_FOR_SELECTOR_TIMEOUT = IS_CI ? 4000 : 2500;
+const WAIT_FOR_NAVIGATION_TIMEOUT = IS_CI ? 6000 : 4000;
+const WAIT_FOR_NETWORK_IDLE_TIMEOUT = IS_CI ? 7500 : 5000;
 
 const randomTimeout = (value: number) => (Math.random() + 0.5) * value;
 
@@ -105,7 +105,7 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
   return result;
 };
 
-export const scrapAmazon = async () => {
+export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1) => {
   let browser;
 
   try {
@@ -169,11 +169,13 @@ export const scrapAmazon = async () => {
     await mainDepartmentsLocator
       .first()
       .waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
-    const mainDepartments = (await mainDepartmentsLocator.all()).slice(0, -1);
+    const allMainDepartments = (await mainDepartmentsLocator.all()).slice(0, -1);
 
-    for (const filter of mainDepartments.slice(1)) {
+    // Dividir categorias entre tasks
+    const mainDepartments = allMainDepartments.slice(1).filter((_, index) => index % totalTasks === taskIndex);
+    
+    for (const filter of mainDepartments) {
       const categoryName = await filter.innerText();
-      console.log(categoryName);
       await clickLikeHuman(filter);
       await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
 
@@ -235,10 +237,9 @@ export const scrapAmazon = async () => {
       new Map(products.map(product => [product.id, product])).values()
     );
 
-    console.log(`✅ Successfully scraped ${uniqueProducts.length} unique products`);
     return uniqueProducts;
   } catch (error: any) {
-    console.error('Fatal error during scraping:', error);
+    console.error(`[Task ${taskIndex}] Fatal error during scraping:`, error);
 
     if (browser) {
       try {
