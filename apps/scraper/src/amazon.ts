@@ -119,7 +119,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
 
   try {
     browser = await chromium.launch({
-      headless: true,
+      headless: false,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -139,11 +139,6 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
 
     const products: Product[] = [];
     const page = await context.newPage();
-
-    await page.setExtraHTTPHeaders({
-      'accept-language': 'pt-PT,pt;q=0.9,en;q=0.8',
-      'upgrade-insecure-requests': '1',
-    });
 
     const createResponseListener = (category: string, subcategory: string) => {
       return async (response: any) => {
