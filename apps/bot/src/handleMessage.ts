@@ -1,9 +1,4 @@
-import {
-  processUserMessage,
-  getSystemPrompt,
-  ProductMessage,
-  IntentType,
-} from '@poupaia/ai';
+import { processUserMessage, getSystemPrompt, ProductMessage, IntentType } from '@poupaia/ai';
 import {
   closeConnection,
   connectToDatabase,
@@ -24,7 +19,7 @@ import {
   clearPendingAlertFilters,
   ProductFilters,
 } from '@poupaia/db';
-import { formatProductsForUser } from '@poupaia/messaging';
+import { formatProductsForUser, sendTelegramMessage, sendTelegramPhoto } from '@poupaia/messaging';
 
 const searchAndFilterProducts = async (
   db: any,
@@ -49,14 +44,18 @@ const searchAndFilterProducts = async (
   return newProducts;
 };
 
-export const handleMessage = async (message: any): Promise<ProductMessage[]> => {
+export const handleMessage = async (message: any): Promise<void> => {
   try {
     const userMessage = message.text;
     const userId = message.from?.id;
     const chatId = message.chat?.id;
 
     if (!userId || !chatId) {
-      return [{ text: 'Não consegui identificar o teu utilizador. Tenta novamente! 🤔' }];
+      await sendTelegramMessage(
+        chatId,
+        'Não consegui identificar o teu utilizador. Tenta novamente! 🤔'
+      );
+      return;
     }
 
     const db = await connectToDatabase();
@@ -68,11 +67,11 @@ export const handleMessage = async (message: any): Promise<ProductMessage[]> => 
     });
 
     if (await isUserBlocked(db, userId)) {
-      return [
-        {
-          text: '🚫 Foste temporariamente bloqueado por enviar mensagens irrelevantes. Tenta novamente mais tarde.',
-        },
-      ];
+      await sendTelegramMessage(
+        chatId,
+        '🚫 Estás temporariamente bloqueado por enviar mensagens irrelevantes. Tenta novamente mais tarde.'
+      );
+      return;
     }
 
     const categories = await getAllCategories(db);
@@ -99,31 +98,41 @@ export const handleMessage = async (message: any): Promise<ProductMessage[]> => 
 
     if (await shouldBlockUser(db, userId)) {
       await blockUser(db, userId, 24);
-      return [
-        {
-          text: '⚠️ Detetámos que enviaste várias mensagens irrelevantes. Estás bloqueado temporariamente por 24 horas.',
-        },
-      ];
+      await sendTelegramMessage(
+        chatId,
+        '🚫 Detetámos que enviaste várias mensagens irrelevantes. Estás bloqueado temporariamente por 24 horas.'
+      );
+      return;
     }
 
     switch (intent.type) {
       case IntentType.IRRELEVANT:
         await clearPendingAlertFilters(db, userId);
-        return [{ text: intent.responseMessage }];
+        await sendTelegramMessage(chatId, intent.responseMessage);
+        return;
 
       case IntentType.DELETE_ALERT: {
         const deletedCount = await deleteUserAlerts(db, userId, intent.deleteAlertData);
 
         if (deletedCount === 0) {
-          return [{ text: 'Não encontrei alertas com esses critérios para apagar. 🤷' }];
+          await sendTelegramMessage(
+            chatId,
+            'Não encontrei alertas com esses critérios para apagar. 🤷'
+          );
+          return;
         }
 
-        return [{ text: `✅ ${deletedCount} alerta(s) apagado(s) com sucesso!` }];
+        await sendTelegramMessage(chatId, `✅ ${deletedCount} alerta(s) apagado(s) com sucesso!`);
+        return;
       }
 
       case IntentType.ALERT: {
         if (!intent.alertData) {
-          return [{ text: 'Não consegui perceber os critérios do alerta. Podes reformular? 🤔' }];
+          await sendTelegramMessage(
+            chatId,
+            'Não consegui perceber os critérios do alerta. Podes reformular? 🤔'
+          );
+          return;
         }
 
         await createAlert(db, {
@@ -135,7 +144,7 @@ export const handleMessage = async (message: any): Promise<ProductMessage[]> => 
           maxPrice: intent.alertData.criteria.maxPrice,
           minDiscount: intent.alertData.criteria.minDiscountPercent,
         });
-        
+
         await clearPendingAlertFilters(db, userId);
 
         const newProducts = await searchAndFilterProducts(
@@ -146,18 +155,24 @@ export const handleMessage = async (message: any): Promise<ProductMessage[]> => 
         );
 
         if (newProducts.length > 0) {
-          
-          const successMessage = {
-            text: `✅ Alerta criado com sucesso!\n\nEncontrei ${newProducts.length} produto(s) que já correspondem aos teus critérios:`,
-          };
-          
-          return [successMessage, ...formatProductsForUser(newProducts)];
+          await sendTelegramMessage(
+            chatId,
+            'Acabei de criar o teu alerta e encontrei alguns produtos que correspondem aos teus critérios! Dá uma olhadela 👀'
+          );
+          for (const product of formatProductsForUser(newProducts)) {
+            if (product.imageUrl) {
+              await sendTelegramPhoto(chatId, product.imageUrl, product.text);
+            } else {
+              await sendTelegramMessage(chatId, product.text);
+            }
+          }
+          return;
         } else {
-          return [
-            {
-              text: `✅ Alerta criado com sucesso!\n\nVou notificar-te quando encontrar produtos que correspondam a: "${intent.filters?.searchQuery || 'os teus critérios'}" 🔔`,
-            },
-          ];
+          await sendTelegramMessage(
+            chatId,
+            'Acabei de criar o teu alerta, mas não encontrei nenhum produto que corresponda aos teus critérios no momento. Vou ficar a aguardar e notifico-te assim que aparecer algo interessante! 🔔'
+          );
+          return;
         }
       }
 
@@ -173,7 +188,13 @@ export const handleMessage = async (message: any): Promise<ProductMessage[]> => 
 
         if (newProducts.length > 0) {
           await clearPendingAlertFilters(db, userId);
-          return formatProductsForUser(newProducts);
+          for (const product of formatProductsForUser(newProducts)) {
+            if (product.imageUrl) {
+              await sendTelegramPhoto(chatId, product.imageUrl, product.text);
+            } else {
+              await sendTelegramMessage(chatId, product.text);
+            }
+          }
         } else {
           await setPendingAlertFilters(db, userId, {
             searchQuery: intent.filters.searchQuery || '',
@@ -184,20 +205,23 @@ export const handleMessage = async (message: any): Promise<ProductMessage[]> => 
             minDiscount: intent.filters.minDiscount,
           });
 
-          return [
-            {
-              text: `😔 Não encontrei produtos com esses critérios.\n\nQueres que crie um alerta para te notificar quando aparecerem produtos relacionados com "${intent.filters.searchQuery}"?`,
-            },
-          ];
+          await sendTelegramMessage(
+            chatId,
+            `😔 Não encontrei produtos com esses critérios.\n\nQueres que crie um alerta para te notificar quando aparecerem produtos relacionados com "${intent.filters.searchQuery}"?`
+          );
+          return;
         }
       }
     }
   } catch (error) {
     console.error('Error processing message:', error);
-    return [{ text: 'Desculpa, não consegui processar a tua mensagem. Podes reformular? 🤔' }];
+    await sendTelegramMessage(
+      message.chat.id,
+      'Não consegui perceber a tua mensagem. Podes reformular? 🤔'
+    );
+    return;
   } finally {
     await closeConnection();
   }
-
-  return [{ text: 'Ops, algo inesperado aconteceu. Tenta novamente mais tarde! 🚧' }];
+  return;
 };

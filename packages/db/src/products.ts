@@ -76,17 +76,24 @@ export const searchProducts = async (
     query.category = { $in: filters.categories };
   }
 
-  if (filters.minPrice !== undefined || filters.maxPrice !== undefined) {
+  if (
+    (filters.minPrice !== undefined && filters.minPrice !== null) ||
+    (filters.maxPrice !== undefined && filters.maxPrice !== null)
+  ) {
     query.currentPrice = {};
-    if (filters.minPrice !== undefined) {
+    if (filters.minPrice !== undefined && filters.minPrice !== null) {
       query.currentPrice.$gte = filters.minPrice;
     }
-    if (filters.maxPrice !== undefined) {
+    if (filters.maxPrice !== undefined && filters.maxPrice !== null) {
       query.currentPrice.$lte = filters.maxPrice;
+    }
+    // Remove empty object if no valid price filters
+    if (Object.keys(query.currentPrice).length === 0) {
+      delete query.currentPrice;
     }
   }
 
-  if (filters.minDiscount !== undefined) {
+  if (filters.minDiscount !== undefined && filters.minDiscount !== null) {
     query.discountPercentage = { $gte: filters.minDiscount };
   }
 

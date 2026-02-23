@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { handleMessage } from './handleMessage';
 import { sendTelegramMessage, sendTelegramPhoto } from '@poupaia/messaging';
@@ -17,23 +18,15 @@ app.post('/', async (req, res) => {
 
     const chatId = update.message.chat.id;
 
-    console.log('Received update:', JSON.stringify(update));
-
-    await sendTelegramMessage(chatId, 'Processando sua mensagem... ⏳');
+    try {
+      await sendTelegramMessage(chatId, 'Já estou a ver isso! Só um segundinho... 😎');
+    } catch (error) {
+      console.error('Failed to send processing message:', error);
+    }
     
     res.status(200).send('OK');
 
-    const messages = await handleMessage(update.message);
-
-    for (const msg of messages) {
-      if (msg.imageUrl) {
-        await sendTelegramPhoto(chatId, msg.imageUrl, msg.text);
-      } else {
-        await sendTelegramMessage(chatId, msg.text);
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 300));
-    }
+    await handleMessage(update.message);
 
   } catch (error) {
     console.error('Error processing webhook:', error);
