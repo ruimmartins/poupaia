@@ -119,7 +119,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
 
   try {
     browser = await chromium.launch({
-      headless: false,
+      headless: true,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
