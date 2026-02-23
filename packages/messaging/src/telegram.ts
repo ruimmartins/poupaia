@@ -1,6 +1,10 @@
 import { Product } from '@poupaia/db';
 import { ProductMessage } from '@poupaia/ai';
 
+const escapeMarkdownV2 = (text: string): string => {
+  return text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+};
+
 export const sendTelegramMessage = async (chatId: string, text: string) => {
   await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: 'POST',
@@ -34,7 +38,7 @@ export const formatProductsForUser = (products: Product[]): ProductMessage[] => 
   if (products.length === 0) {
     return [
       {
-        text: '😔 Não encontrei produtos com esses critérios. Tenta ser menos específico!',
+        text: escapeMarkdownV2('😔 Não encontrei produtos com esses critérios. Tenta ser menos específico!'),
       },
     ];
   }
@@ -42,7 +46,7 @@ export const formatProductsForUser = (products: Product[]): ProductMessage[] => 
   const messages: ProductMessage[] = [];
 
   messages.push({
-    text: `🎉 Encontrei ${products.length} produto(s) para ti!`,
+    text: escapeMarkdownV2(`🎉 Encontrei ${products.length} produto(s) para ti!`),
   });
 
   for (const product of products) {
@@ -63,10 +67,10 @@ export const formatProductsForUser = (products: Product[]): ProductMessage[] => 
 
     const emoji = discount >= 60 ? '🔥' : discount >= 40 ? '⚡' : '💰';
 
-    let message = `${emoji} *${product.title}*\n\n`;
+    let message = `${emoji} *${escapeMarkdownV2(product.title)}*\n\n`;
 
     if (discount && originalPrice) {
-      message += `antes: ~${originalPrice.toFixed(2)}€~ \n **🔥AGORA: ${currentPrice.toFixed(2)}€** (-${discount}%) 🔥\n`;
+      message += `antes: ~${escapeMarkdownV2(originalPrice.toFixed(2) + '€')}~ \n*🔥AGORA: ${escapeMarkdownV2(currentPrice.toFixed(2) + '€')}* ${escapeMarkdownV2(`(-${discount}%)`)} 🔥\n`;
     }
 
     if (product.expiresAt) {
@@ -75,7 +79,7 @@ export const formatProductsForUser = (products: Product[]): ProductMessage[] => 
       const hoursLeft = Math.floor((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60));
 
       if (hoursLeft < 24) {
-        message += `⏰ Expira em *${hoursLeft}h*\n`;
+        message += `⏰ Expira em *${escapeMarkdownV2(hoursLeft + 'h')}*\n`;
       }
     }
 
