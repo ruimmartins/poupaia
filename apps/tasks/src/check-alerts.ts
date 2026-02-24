@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+import path from 'path';
+import { existsSync } from 'fs';
 import { Listr } from "listr2";
 import {
   connectToDatabase,
@@ -10,9 +13,6 @@ import {
   markProductsAsSentToUser,
 } from "@poupaia/db";
 import { sendTelegramMessage, formatProductsForUser } from "@poupaia/messaging";
-import * as dotenv from 'dotenv';
-import path from 'path';
-import { existsSync } from 'fs';
 
 const envPath = path.resolve(__dirname, '../.env');
 if (existsSync(envPath)) {
@@ -61,12 +61,7 @@ const main = async () => {
               ctx.db,
               alert.searchQuery || '',
               {
-                categories: alert.categories,
-                keywordGroups: alert.keywordGroups,
-                minPrice: alert.minPrice,
-                maxPrice: alert.maxPrice,
-                minDiscount: alert.minDiscount,
-                notExpired: true,
+                ...alert.filters,
               }
             );
 
@@ -75,10 +70,9 @@ const main = async () => {
             );
 
             if (newProducts.length > 0) {
-              const productsToSend = newProducts.slice(0, 10);
-              const messages = formatProductsForUser(productsToSend);
+              const messages = formatProductsForUser(newProducts);
               
-              const alertIntro = `🔔 *Alerta!*\nEncontrei ${productsToSend.length} produto(s) que correspondem ao teu alerta:\n"${alert.searchQuery || 'critérios definidos'}"\n\n`;
+              const alertIntro = `🔔 *Alerta!*\nEncontrei ${newProducts.length} produto(s) que correspondem ao teu alerta:\n"${alert.searchQuery || 'critérios definidos'}"\n\n`;
               
               await sendTelegramMessage(alert.chatId.toString(), alertIntro);
               
@@ -90,7 +84,7 @@ const main = async () => {
               await markProductsAsSentToUser(
                 ctx.db,
                 alert.userId,
-                productsToSend.map(p => p.id)
+                newProducts.map(p => p.id)
               );
               
               await updateAlertLastTriggered(ctx.db, alert.id);
