@@ -13,7 +13,7 @@ if (existsSync(envPath)) {
 
 const main = async () => {
   const startTime = Date.now();
-  const PARALLEL_TASKS = 3; // Número de scrapers em paralelo
+  const PARALLEL_TASKS = 1; // Número de scrapers em paralelo
   
   const tasks = new Listr([
     {

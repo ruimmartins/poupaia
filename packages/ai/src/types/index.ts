@@ -9,26 +9,18 @@ export enum IntentType {
 
 export interface AIResponse {
   isRelevant: boolean;
-  messageType?: IntentType;
-  filters?: any;
-  userMessage?: string;
+  messageType: IntentType;
+  filters: any;
+  userMessage: string;
 }
 
 export interface ProcessedMessage {
   type: IntentType;
   filters?: ProductFilters;
-  alertData?: {
-    criteria: {
-      categories?: string[];
-      keywordGroups?: string[][];
-      maxPrice?: number;
-      minDiscountPercent?: number;
-    };
-  };
-  deleteAlertData?: {
-    categories?: string[];
-    keywordGroups?: string[][];
-  };
+  categories?: string[];
+  keywordGroups?: string[][];
+  maxPrice?: number;
+  minDiscountPercent?: number;
   responseMessage: string;
 }
 

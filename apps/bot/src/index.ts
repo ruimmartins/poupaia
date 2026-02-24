@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import { handleMessage } from './handleMessage';
-import { sendTelegramMessage, sendTelegramPhoto } from '@poupaia/messaging';
 
 const app = express();
 app.use(express.json());
@@ -14,14 +13,6 @@ app.post('/', async (req, res) => {
 
     if (!update?.message?.chat?.id) {
       return res.status(400).send('Bad Request');
-    }
-
-    const chatId = update.message.chat.id;
-
-    try {
-      await sendTelegramMessage(chatId, 'Já estou a ver isso! Só um segundinho... 😎');
-    } catch (error) {
-      console.error('Failed to send processing message:', error);
     }
     
     res.status(200).send('OK');

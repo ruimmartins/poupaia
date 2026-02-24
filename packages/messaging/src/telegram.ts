@@ -2,7 +2,7 @@ import { Product } from '@poupaia/db';
 import { ProductMessage } from '@poupaia/ai';
 
 // Função de escape robusta para MarkdownV2
-const escapeMarkdownV2 = (text: string | number): string => {
+export const escapeMarkdownV2 = (text: string | number): string => {
   return text
     .toString()
     .replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
@@ -20,7 +20,7 @@ export const sendTelegramMessage = async (chat_id: string | number, text: string
       }),
     });
     const data = await response.json();
-    if (!data.ok) throw new Error(`Telegram API error: ${data.description}`);
+    if (!data.ok) throw new Error(`Telegram API error: ${data.description} with text: ${text}`);
     return data;
   } catch (error) {
     throw error;
@@ -40,7 +40,7 @@ export const sendTelegramPhoto = async (chat_id: string | number, photoUrl: stri
       }),
     });
     const data = await response.json();
-    if (!data.ok) throw new Error(`Telegram API error: ${data.description}`);
+    if (!data.ok) throw new Error(`Telegram API error: ${data.description} with caption: ${caption}`);
     return data;
   } catch (error) {
     throw error;
@@ -49,13 +49,14 @@ export const sendTelegramPhoto = async (chat_id: string | number, photoUrl: stri
 
 export const formatProductsForUser = (products: Product[]): ProductMessage[] => {
   if (products.length === 0) {
-    return [{ text: '😔 Não encontrei produtos com esses critérios. Tenta ser menos específico!' }];
+    return [{ text: escapeMarkdownV2('😔 Não encontrei produtos com esses critérios. Tenta ser menos específico!') }];
   }
 
   const messages: ProductMessage[] = [];
-  messages.push({ text: `🎉 Encontrei ${products.length} produto(s) para ti\\!` }); // Note o escape no !
+  messages.push({ text: escapeMarkdownV2(`🎉 Encontrei ${products.length} produto(s) para ti!`) }); // Note o escape no !
 
   for (const product of products) {
+
     const currentPrice = typeof product.currentPrice === 'string' ? parseFloat(product.currentPrice) : (product.currentPrice ?? 0);
     const originalPrice = typeof product.originalPrice === 'string' ? parseFloat(product.originalPrice) : (product.originalPrice ?? 0);
 
@@ -66,7 +67,6 @@ export const formatProductsForUser = (products: Product[]): ProductMessage[] => 
 
     const emoji = discount >= 60 ? '🔥' : discount >= 40 ? '⚡' : '💰';
     
-    // ESCAPE DAS VARIÁVEIS INDIVIDUAIS
     const safeTitle = escapeMarkdownV2(product.title);
     const safeOldPrice = escapeMarkdownV2(originalPrice.toFixed(2));
     const safeNewPrice = escapeMarkdownV2(currentPrice.toFixed(2));
@@ -75,7 +75,7 @@ export const formatProductsForUser = (products: Product[]): ProductMessage[] => 
     let message = `${emoji} *${safeTitle}*\n\n`;
 
     if (discount && originalPrice) {
-      message += `antes: ~${safeOldPrice}€~ \n*🔥 AGORA: ${safeNewPrice}€* \\(\-${safeDiscount}%\\) 🔥\n`;
+      message += `antes: ~${safeOldPrice}€~ \n*🔥 AGORA: ${safeNewPrice}€* \\(\\-${safeDiscount}%\\) 🔥\n`;
     }
 
     if (product.expiresAt) {
@@ -86,7 +86,7 @@ export const formatProductsForUser = (products: Product[]): ProductMessage[] => 
     }
 
     // A URL do link não deve ser escapada pela função global, apenas caracteres que quebrem o MD (raro em URLs Amazon)
-    message += `\n🛒 [Compra aqui](${product.url}?tag=ruimmartins-20)`;
+    message += `\n🛒 [Compra aqui](${product.url}?tag=ruimmartins-20)\n\n`;
 
     messages.push({
       text: message,

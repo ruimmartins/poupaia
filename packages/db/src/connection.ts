@@ -26,7 +26,7 @@ export const connectToDatabase = async (): Promise<Db> => {
   try {
     const mongoClient = getMongoClient();
     await mongoClient.connect();
-    console.log('Successfully connected to MongoDB Atlas');
+    /* console.log('Successfully connected to MongoDB Atlas'); */
     
     // Replace 'your-database-name' with your actual database name
     db = mongoClient.db(process.env.MONGODB_PRODUCTS_DB_NAME || 'products');
@@ -45,7 +45,7 @@ export const closeConnection = async (): Promise<void> => {
     isConnected = false;
     db = null;
     client = null;
-    console.log('MongoDB connection closed');
+    /* console.log('MongoDB connection closed'); */
   }
 }
 

@@ -95,6 +95,7 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
           : 'https://via.placeholder.com/226',
         title,
         brand,
+        brandLevel: 0,
         originalPrice: originalPrice || currentPrice,
         currentPrice,
         currency: '€',
@@ -195,7 +196,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
       .slice(1)
       .filter((_, index) => index % totalTasks === taskIndex);
 
-    for (const filter of mainDepartments) {
+    for (const filter of mainDepartments.slice(0, 3)) {
       const categoryName = await filter.innerText();
       await clickLikeHuman(filter);
       await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });

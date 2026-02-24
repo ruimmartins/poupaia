@@ -8,7 +8,7 @@ export const processUserMessage = async (systemInstruction: string, userMessage:
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-flash-latest',
+      model: 'gemini-2.5-flash-lite',
       systemInstruction,
     });
 
@@ -35,49 +35,17 @@ export const processUserMessage = async (systemInstruction: string, userMessage:
     }
 
     const filters: ProductFilters = {
-      notExpired: true,
-      limit: parsed.messageType === IntentType.SEARCH ? 10 : undefined,
+      limit: 10,
       sortBy: 'createdAt',
       sortOrder: 'desc',
       ...parsed.filters,
     };
 
-    if (parsed.messageType === IntentType.ALERT) {
-      const alertData = {
-        criteria: {
-          categories: parsed.filters?.categories || [],
-          keywordGroups: parsed.filters?.keywordGroups,
-          maxPrice: parsed.filters?.maxPrice,
-          minDiscountPercent: parsed.filters?.minDiscount,
-        }
-      };
-
-      return {
-        type: IntentType.ALERT,
-        filters,
-        alertData,
-        responseMessage: parsed.userMessage || '✅ Alerta criado! Vou avisar-te quando encontrar algo.'
-      };
-    }
-
-    if (parsed.messageType === IntentType.DELETE_ALERT) {
-      const deleteAlertData = {
-        categories: parsed.filters?.categories || [],
-        keywordGroups: parsed.filters?.keywordGroups,
-      };
-
-      return {
-        type: IntentType.DELETE_ALERT,
-        deleteAlertData,
-        responseMessage: parsed.userMessage || '✅ Alerta removido!'
-      };
-    }
-
     return {
-      type: IntentType.SEARCH,
+      type: parsed.messageType,
       filters,
-      responseMessage: parsed.userMessage || 'A procurar produtos... 🔍'
-    };
+      responseMessage: parsed.userMessage
+    }
 
   } catch (error) {
     console.error('Erro ao processar mensagem com Gemini:', error);
@@ -85,10 +53,8 @@ export const processUserMessage = async (systemInstruction: string, userMessage:
     return {
       type: IntentType.SEARCH,
       filters: {
-        onlyGoodDeals: true,
-        notExpired: true,
         limit: 10,
-        sortBy: 'dealScore',
+        sortBy: 'discountPercentage',
         sortOrder: 'desc'
       },
       responseMessage: 'A mostrar-te as melhores ofertas disponíveis! 🎯'

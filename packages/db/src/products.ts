@@ -1,8 +1,8 @@
-import { Db, Collection, Filter } from 'mongodb';
+import fs from 'fs';
+import path from 'path';
+import { Db, Collection } from 'mongodb';
 import { Product } from './models/products';
 import { ProductFilters } from './models/product-filters';
-
-const escapeRegex = (text: string) => text.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
 
 export const getProductsCollection = async (db: Db): Promise<Collection<Product>> =>
   db.collection<Product>('products');
@@ -12,9 +12,14 @@ export const getAllCategories = async (db: Db): Promise<string[]> =>
 
 export const createOrUpdateProducts = async (db: Db, products: Product[]) => {
   const collection = await getProductsCollection(db);
+  const content = fs.readFileSync(path.resolve(__dirname, './helpers/files/good-brands.csv'), 'utf8');
+
+  const brands = content.split(',').map(brand => brand.trim());
 
   const bulkOps = products.map(product => {
-    const { createdAt, ...productWithoutCreatedAt } = product;
+    const { createdAt, ...productWithoutCreatedAt } = product; 
+
+    productWithoutCreatedAt.brandLevel = brands.includes(product.brand ?? 'not a brand') ? 1 : 0;
 
     return {
       updateOne: {
@@ -125,25 +130,17 @@ export const searchProducts = async (
     andConditions.push(...keywordConditions);
   }
 
-  if (filters.notExpired) {
-    andConditions.push({
-      $or: [{ expiresAt: null }, { expiresAt: { $gte: new Date().toISOString() } }],
-    });
-  }
-
   if (andConditions.length > 0) {
     query.$and = andConditions;
   }
 
   const results = await collection
-    .find(query, {
-      projection: {
-        score: { $meta: 'textScore' },
-      },
-    })
-    .sort({ score: { $meta: 'textScore' } })
+    .find(query/* , {
+      projection: { score: { $meta: 'textScore' }, brandLevel: 1 },
+    } */)
+    .sort({ score: { $meta: 'textScore' }, brandLevel: -1 })
     .limit(filters.limit || 20)
     .toArray();
 
   return results;
-}
+};
