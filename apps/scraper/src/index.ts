@@ -1,9 +1,9 @@
-import { Listr } from "listr2";
-import { scrapAmazon } from "./amazon";
-import { connectToDatabase, closeConnection, Product, deleteInvalidProducts, createOrUpdateProducts } from "@poupaia/db";
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { existsSync } from 'fs';
+import { Listr } from "listr2";
+import { scrapAmazon } from "./amazon";
+import { connectToDatabase, closeConnection, Product, createOrUpdateProducts } from "@poupaia/db";
 
 // Carregar .env da pasta apps/scraper (apenas em desenvolvimento local)
 const envPath = path.resolve(__dirname, '../.env');

@@ -1,4 +1,4 @@
-import { processUserMessage, getSystemPrompt, ProductMessage, IntentType } from '@poupaia/ai';
+import { processUserMessage, getSystemPrompt, IntentType } from '@poupaia/ai';
 import {
   closeConnection,
   connectToDatabase,
