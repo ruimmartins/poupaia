@@ -195,8 +195,12 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
     const mainDepartments = allMainDepartments
       .slice(1)
       .filter((_, index) => index % totalTasks === taskIndex);
+    
+    if(process.env.DEVELOPMENT_MODE === 'true') {
+      mainDepartments.splice(1); // Para desenvolvimento, limitar a 1 categoria principal (além de "Todas as categorias")
+    }
 
-    for (const filter of mainDepartments.slice(0, 3)) {
+    for (const filter of mainDepartments) {
       const categoryName = await filter.innerText();
       await clickLikeHuman(filter);
       await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
