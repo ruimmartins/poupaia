@@ -20,7 +20,7 @@ export const sendTelegramMessage = async (chat_id: string | number, text: string
       }),
     });
     const data = await response.json();
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     if (!data.ok) throw new Error(`Telegram API error: ${data.description} with text: ${text}`);
     return data;
   } catch (error) {
@@ -41,7 +41,7 @@ export const sendTelegramPhoto = async (chat_id: string | number, photoUrl: stri
       }),
     });
     const data = await response.json();
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 1000));
     if (!data.ok) throw new Error(`Telegram API error: ${data.description} with caption: ${caption}`);
     return data;
   } catch (error) {

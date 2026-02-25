@@ -32,6 +32,9 @@ importers:
       '@poupaia/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging
+      '@poupaia/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@types/express':
         specifier: ^5.0.6
         version: 5.0.6
@@ -81,6 +84,15 @@ importers:
 
   apps/tasks:
     dependencies:
+      '@poupaia/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@poupaia/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
+      '@poupaia/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
@@ -160,8 +172,17 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/utils:
+  packages/shared:
     dependencies:
+      '@poupaia/db':
+        specifier: workspace:*
+        version: link:../db
+      '@poupaia/messaging':
+        specifier: workspace:*
+        version: link:../messaging
+      mongodb:
+        specifier: ^7.1.0
+        version: 7.1.0
       ts-node:
         specifier: ^10.9.2
         version: 10.9.2(@types/node@25.2.3)(typescript@5.9.3)

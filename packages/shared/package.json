@@ -1,5 +1,5 @@
 {
-  "name": "@poupaia/utils",
+  "name": "@poupaia/shared",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -11,6 +11,9 @@
   "license": "ISC",
   "packageManager": "pnpm@10.29.3",
   "dependencies": {
+    "@poupaia/messaging": "workspace:*",
+    "@poupaia/db": "workspace:*",
+    "mongodb": "^7.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

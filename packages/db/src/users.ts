@@ -37,12 +37,8 @@ export const getOrCreateUser = async (
 
 export const isUserBlocked = async (
   db: Db,
-  userId: number
+  user: User
 ): Promise<boolean> => {
-  const collection = await getUsersCollection(db);
-
-  const user = await collection.findOne({ id: userId });
-
   if (!user || !user.blockedUntil) {
     return false;
   }
@@ -51,10 +47,7 @@ export const isUserBlocked = async (
   const now = new Date();
 
   if (now >= blockedUntil) {
-    await collection.updateOne(
-      { id: userId },
-      { $unset: { blockedUntil: "" } }
-    );
+    await unblockUser(db, user.id);
     return false;
   }
 

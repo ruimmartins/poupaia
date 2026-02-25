@@ -1,35 +1,22 @@
-import { Message } from '@poupaia/db';
+import { Message, ProductFilters } from '@poupaia/db';
 
 const formatMessageHistory = (messages: Message[]): string => {
   if (messages.length === 0) return '';
-  
+
   // Mostrar apenas últimas 3 mensagens, formato ultra-compacto
   const history = messages
     .slice(0, 3)
     .reverse() // Ordem cronológica
     .map(m => `${m.intentType}:"${m.text.substring(0, 40)}"`) // Limitar a 40 chars
     .join(' | ');
-  
+
   return `\nCONTEXTO: ${history}`;
 };
 
-export const getSystemPrompt = (
-  categories: string[], 
-  messageHistory: Message[] = [],
-  pendingAlertFilters?: {
-    searchQuery: string;
-    categories?: string[];
-    keywordGroups?: string[][];
-    minPrice?: number;
-    maxPrice?: number;
-    minDiscount?: number;
-  }
-) => {
+export const getSystemPrompt = (categories: string[], messageHistory: Message[] = [], pendingAlertFilters?: ProductFilters) => {
   const contextSection = formatMessageHistory(messageHistory);
-  const pendingAlertSection = pendingAlertFilters 
-    ? `\n\nALERTA PENDENTE: O utilizador acabou de fazer uma pesquisa sem resultados. Se ele responder "sim", "quero", "cria", "ok" ou similar, deve criar um alerta com estes filtros: ${JSON.stringify(pendingAlertFilters)}`
-    : '';
-  
+  const pendingAlertSection = pendingAlertFilters ? `\n\nALERTA PENDENTE: O utilizador acabou de fazer uma pesquisa sem resultados. Se ele responder "sim", "quero", "cria", "ok" ou similar, deve criar um alerta com estes filtros: ${JSON.stringify(pendingAlertFilters)}` : '';
+
   return `Analisa mensagens e identifica produtos.${contextSection}${pendingAlertSection}
 
 CAT: ${categories.join(', ')}
@@ -65,6 +52,5 @@ EX:
 
 "avisa portáteis" → {"isRelevant":true,"messageType":"alert","filters":{"searchQuery":"portáteis","keywordGroups":[["portátil","laptop"]]},"userMessage":"Ok!"}
 
-"sapatilhas <40€" → {"isRelevant":true,"messageType":"search","filters":{"searchQuery":"sapatilhas","keywordGroups":[["sapatilhas","sneakers"]],"maxPrice":40},"userMessage":"A procurar..."}`
+"sapatilhas <40€" → {"isRelevant":true,"messageType":"search","filters":{"searchQuery":"sapatilhas","keywordGroups":[["sapatilhas","sneakers"]],"maxPrice":40},"userMessage":"A procurar..."}`;
 };
-

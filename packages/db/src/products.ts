@@ -3,12 +3,11 @@ import path from 'path';
 import { Db, Collection } from 'mongodb';
 import { Product } from './models/products';
 import { ProductFilters } from './models/product-filters';
+import { getUserSentProducts } from './users';
 
-export const getProductsCollection = async (db: Db): Promise<Collection<Product>> =>
-  db.collection<Product>('products');
+export const getProductsCollection = async (db: Db): Promise<Collection<Product>> => db.collection<Product>('products');
 
-export const getAllCategories = async (db: Db): Promise<string[]> =>
-  await db.collection('products').distinct('category');
+export const getAllCategories = async (db: Db): Promise<string[]> => await db.collection('products').distinct('category');
 
 export const createOrUpdateProducts = async (db: Db, products: Product[]) => {
   const collection = await getProductsCollection(db);
@@ -17,7 +16,7 @@ export const createOrUpdateProducts = async (db: Db, products: Product[]) => {
   const brands = content.split(',').map(brand => brand.trim());
 
   const bulkOps = products.map(product => {
-    const { createdAt, ...productWithoutCreatedAt } = product; 
+    const { createdAt, ...productWithoutCreatedAt } = product;
 
     productWithoutCreatedAt.brandLevel = brands.includes(product.brand ?? 'not a brand') ? 1 : 0;
 
@@ -64,11 +63,7 @@ export const deleteInvalidProducts = async (db: Db) => {
   });
 };
 
-export const searchProducts = async (
-  db: Db,
-  searchQuery: string,
-  filters: Partial<ProductFilters> = {}
-): Promise<Product[]> => {
+export const searchProducts = async (db: Db, searchQuery: string, filters: Partial<ProductFilters> = {}): Promise<Product[]> => {
   const collection = await getProductsCollection(db);
 
   const query: any = {
@@ -81,10 +76,7 @@ export const searchProducts = async (
     query.category = { $in: filters.categories };
   }
 
-  if (
-    (filters.minPrice !== undefined && filters.minPrice !== null) ||
-    (filters.maxPrice !== undefined && filters.maxPrice !== null)
-  ) {
+  if ((filters.minPrice !== undefined && filters.minPrice !== null) || (filters.maxPrice !== undefined && filters.maxPrice !== null)) {
     query.currentPrice = {};
     if (filters.minPrice !== undefined && filters.minPrice !== null) {
       query.currentPrice.$gte = filters.minPrice;
@@ -104,18 +96,7 @@ export const searchProducts = async (
 
   if (filters.keywordGroups && filters.keywordGroups.length > 0) {
     const keywordConditions = filters.keywordGroups.map(group => {
-      const wordsNeedingBoundary = [
-        'men',
-        'man',
-        'boy',
-        'girl',
-        'kid',
-        'baby',
-        'toddler',
-        'laptop',
-        'pc',
-        'computer',
-      ];
+      const wordsNeedingBoundary = ['men', 'man', 'boy', 'girl', 'kid', 'baby', 'toddler', 'laptop', 'pc', 'computer'];
 
       return {
         $or: group.map(keyword => {
@@ -135,12 +116,21 @@ export const searchProducts = async (
   }
 
   const results = await collection
-    .find(query/* , {
+    .find(
+      query /* , {
       projection: { score: { $meta: 'textScore' }, brandLevel: 1 },
-    } */)
+    } */
+    )
     .sort({ score: { $meta: 'textScore' }, brandLevel: -1 })
     .limit(filters.limit || 20)
     .toArray();
 
   return results;
+};
+
+export const searchAndFilterProducts = async (db: Db, userId: number, searchQuery: string, filters: Partial<ProductFilters>) => {
+  const userSentProductIds = await getUserSentProducts(db, userId);
+  const allProducts = await searchProducts(db, searchQuery, filters);
+
+  return allProducts.filter(p => !userSentProductIds.includes(p.id));
 };

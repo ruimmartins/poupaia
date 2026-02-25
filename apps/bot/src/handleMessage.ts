@@ -1,8 +1,9 @@
 import { processUserMessage, getSystemPrompt, IntentType } from '@poupaia/ai';
+import { sendProductsToUser } from '@poupaia/shared';
+import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
 import {
   closeConnection,
   connectToDatabase,
-  searchProducts,
   getAllCategories,
   createAlert,
   deleteUserAlerts,
@@ -12,44 +13,11 @@ import {
   blockUser,
   getOrCreateUser,
   getLastUserMessages,
-  getUserSentProducts,
-  markProductsAsSentToUser,
   setPendingAlertFilters,
   getPendingAlertFilters,
   clearPendingAlertFilters,
-  ProductFilters,
+  searchAndFilterProducts,
 } from '@poupaia/db';
-import {
-  escapeMarkdownV2,
-  formatProductsForUser,
-  sendTelegramMessage,
-  sendTelegramPhoto,
-  MESSAGES,
-  getRandomMessage,
-} from '@poupaia/messaging';
-
-const searchAndFilterProducts = async (
-  db: any,
-  userId: number,
-  searchQuery: string,
-  filters: Partial<ProductFilters>
-) => {
-  const userSentProductIds = await getUserSentProducts(db, userId);
-
-  const allProducts = await searchProducts(db, searchQuery, filters);
-
-  const newProducts = allProducts.filter(p => !userSentProductIds.includes(p.id));
-
-  if (newProducts.length > 0) {
-    await markProductsAsSentToUser(
-      db,
-      userId,
-      newProducts.map(p => p.id)
-    );
-  }
-
-  return newProducts;
-};
 
 export const handleMessage = async (message: any): Promise<void> => {
   try {
@@ -57,36 +25,27 @@ export const handleMessage = async (message: any): Promise<void> => {
     const userId = message.from?.id;
     const chatId = message.chat?.id;
 
-    await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.LOADING)));
-
-    if (!userId || !chatId) {
-      await sendTelegramMessage(
-        chatId,
-        escapeMarkdownV2(getRandomMessage(MESSAGES.USER_NOT_FOUND))
-      );
-      return;
-    }
-
     const db = await connectToDatabase();
 
-    await getOrCreateUser(db, userId, message.from);
-
-    if (await isUserBlocked(db, userId)) {
-      await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.USER_BLOCKED)));
-      return;
-    }
-
+    const user = await getOrCreateUser(db, userId, message.from);
     const categories = await getAllCategories(db);
     const messageHistory = await getLastUserMessages(db, userId, 3);
     const pendingAlertFilters = await getPendingAlertFilters(db, userId);
 
-    const SYSTEM_INSTRUCTIONS = getSystemPrompt(
-      categories,
-      messageHistory,
-      pendingAlertFilters || undefined
-    );
+    await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.LOADING)));
 
-    const intent = await processUserMessage(SYSTEM_INSTRUCTIONS, userMessage);
+    if (!userId || !chatId) {
+      await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.USER_NOT_FOUND)));
+      return;
+    }
+
+    if (await isUserBlocked(db, user)) {
+      await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.USER_BLOCKED)));
+      return;
+    }
+
+    const systemPrompt = getSystemPrompt(categories, messageHistory, pendingAlertFilters || undefined);
+    const intent = await processUserMessage(systemPrompt, userMessage);
 
     await sendTelegramMessage(chatId, escapeMarkdownV2(intent.responseMessage));
 
@@ -99,12 +58,11 @@ export const handleMessage = async (message: any): Promise<void> => {
 
     if (await shouldBlockUser(db, userId)) {
       await blockUser(db, userId, 24);
-      await sendTelegramMessage(
-        chatId,
-        escapeMarkdownV2(getRandomMessage(MESSAGES.USER_BLOCKED_24H))
-      );
+      await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.USER_BLOCKED_24H)));
       return;
     }
+
+    if (!intent.filters) intent.filters = {};
 
     switch (intent.type) {
       case IntentType.IRRELEVANT:
@@ -116,82 +74,56 @@ export const handleMessage = async (message: any): Promise<void> => {
         const deletedCount = await deleteUserAlerts(db, userId, intent.filters);
 
         if (deletedCount === 0) {
-          await sendTelegramMessage(
-            chatId,
-            escapeMarkdownV2(getRandomMessage(MESSAGES.ALERTS_NOT_FOUND))
-          );
+          await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.ALERTS_NOT_FOUND)));
           return;
         }
 
-        await sendTelegramMessage(
-          chatId,
-          escapeMarkdownV2(getRandomMessage(MESSAGES.ALERTS_DELETED(deletedCount)))
-        );
+        await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.ALERTS_DELETED(deletedCount))));
         return;
       }
 
       case IntentType.SEARCH:
-      case IntentType.ALERT: {
-        if (!intent.filters) intent.filters = {};
-
-        if (intent.type === IntentType.ALERT) {
-          await createAlert(db, {
-            userId,
-            chatId,
-            searchQuery: intent.filters?.searchQuery || '',
-            ...intent.filters,
-          });
-
-          await sendTelegramMessage(
-            chatId,
-            escapeMarkdownV2(getRandomMessage(MESSAGES.ALERT_CREATED))
-          );
-
-          await clearPendingAlertFilters(db, userId);
-        }
-
-        const newProducts = await searchAndFilterProducts(
-          db,
-          userId,
-          intent.filters.searchQuery || '',
-          intent.filters
-        );
+        const newProducts = await searchAndFilterProducts(db, userId, intent.filters.searchQuery || '', intent.filters);
 
         if (newProducts.length > 0) {
           await clearPendingAlertFilters(db, userId);
-          await sendTelegramMessage(
-            chatId,
-            escapeMarkdownV2(getRandomMessage(MESSAGES.PRODUCTS_FOUND(newProducts.length)))
-          );
-          for (const product of formatProductsForUser(newProducts)) {
-            if (product.imageUrl) {
-              await sendTelegramPhoto(chatId, product.imageUrl, product.text);
-            } else {
-              await sendTelegramMessage(chatId, product.text);
-            }
-          }
+
+          await sendProductsToUser(db, userId, chatId, newProducts);
         } else {
           await setPendingAlertFilters(db, userId, {
             searchQuery: intent.filters.searchQuery ?? '',
             ...intent.filters,
           });
 
-          await sendTelegramMessage(
-            chatId,
-            escapeMarkdownV2(
-              getRandomMessage(MESSAGES.PRODUCTS_NOT_FOUND(intent.filters.searchQuery || ''))
-            )
-          );
-          return;
+          await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.PRODUCTS_NOT_FOUND(intent.filters.searchQuery || ''))));
         }
+        return;
+      case IntentType.ALERT: {
+        await createAlert(db, {
+          userId,
+          chatId,
+          searchQuery: intent.filters?.searchQuery || '',
+          ...intent.filters,
+        });
+
+        await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.ALERT_CREATED)));
+
+        await clearPendingAlertFilters(db, userId);
+
+        const newProducts = await searchAndFilterProducts(db, userId, intent.filters.searchQuery || '', intent.filters);
+
+        if (newProducts.length > 0) {
+          await clearPendingAlertFilters(db, userId);
+          if (intent.type === IntentType.ALERT) await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.ALERT_TRIGGERED(newProducts.length, intent.filters.searchQuery || ''))));
+          await sendProductsToUser(db, userId, chatId, newProducts);
+        }
+
+        return;
       }
     }
   } catch (error) {
     console.error('Error processing message:', error);
-    await sendTelegramMessage(
-      message.chat.id,
-      escapeMarkdownV2(getRandomMessage(MESSAGES.MESSAGE_NOT_UNDERSTOOD))
-    );
+    await sendTelegramMessage(message.chat.id, escapeMarkdownV2(getRandomMessage(MESSAGES.MESSAGE_NOT_UNDERSTOOD)));
     return;
   } finally {
     await closeConnection();
