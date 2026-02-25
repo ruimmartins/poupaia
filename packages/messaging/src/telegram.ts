@@ -20,6 +20,7 @@ export const sendTelegramMessage = async (chat_id: string | number, text: string
       }),
     });
     const data = await response.json();
+    await new Promise(resolve => setTimeout(resolve, 300));
     if (!data.ok) throw new Error(`Telegram API error: ${data.description} with text: ${text}`);
     return data;
   } catch (error) {
@@ -40,6 +41,7 @@ export const sendTelegramPhoto = async (chat_id: string | number, photoUrl: stri
       }),
     });
     const data = await response.json();
+    await new Promise(resolve => setTimeout(resolve, 300));
     if (!data.ok) throw new Error(`Telegram API error: ${data.description} with caption: ${caption}`);
     return data;
   } catch (error) {
@@ -48,12 +50,7 @@ export const sendTelegramPhoto = async (chat_id: string | number, photoUrl: stri
 };
 
 export const formatProductsForUser = (products: Product[]): ProductMessage[] => {
-  if (products.length === 0) {
-    return [{ text: escapeMarkdownV2('😔 Não encontrei produtos com esses critérios. Tenta ser menos específico!') }];
-  }
-
   const messages: ProductMessage[] = [];
-  messages.push({ text: escapeMarkdownV2(`🎉 Encontrei ${products.length} produto(s) para ti!`) }); // Note o escape no !
 
   for (const product of products) {
 

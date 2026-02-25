@@ -12,7 +12,7 @@ import {
   getUserSentProducts,
   markProductsAsSentToUser,
 } from "@poupaia/db";
-import { sendTelegramMessage, formatProductsForUser } from "@poupaia/messaging";
+import { sendTelegramMessage, formatProductsForUser, getRandomMessage, MESSAGES, escapeMarkdownV2 } from "@poupaia/messaging";
 
 const envPath = path.resolve(__dirname, '../.env');
 if (existsSync(envPath)) {
@@ -72,13 +72,10 @@ const main = async () => {
             if (newProducts.length > 0) {
               const messages = formatProductsForUser(newProducts);
               
-              const alertIntro = `🔔 *Alerta!*\nEncontrei ${newProducts.length} produto(s) que correspondem ao teu alerta:\n"${alert.searchQuery || 'critérios definidos'}"\n\n`;
-              
-              await sendTelegramMessage(alert.chatId.toString(), alertIntro);
+              await sendTelegramMessage(alert.chatId.toString(), escapeMarkdownV2(getRandomMessage(MESSAGES.ALERT_TRIGGERED(newProducts.length, alert.searchQuery))));
               
               for (const message of messages) {
                 await sendTelegramMessage(alert.chatId.toString(), message.text);
-                await new Promise(resolve => setTimeout(resolve, 100));
               }
 
               await markProductsAsSentToUser(

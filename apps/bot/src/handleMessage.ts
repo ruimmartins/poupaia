@@ -19,7 +19,14 @@ import {
   clearPendingAlertFilters,
   ProductFilters,
 } from '@poupaia/db';
-import { escapeMarkdownV2, formatProductsForUser, sendTelegramMessage, sendTelegramPhoto } from '@poupaia/messaging';
+import {
+  escapeMarkdownV2,
+  formatProductsForUser,
+  sendTelegramMessage,
+  sendTelegramPhoto,
+  MESSAGES,
+  getRandomMessage,
+} from '@poupaia/messaging';
 
 const searchAndFilterProducts = async (
   db: any,
@@ -50,12 +57,12 @@ export const handleMessage = async (message: any): Promise<void> => {
     const userId = message.from?.id;
     const chatId = message.chat?.id;
 
-    await sendTelegramMessage(chatId, escapeMarkdownV2('Já estou a ver isso! Só um segundinho... 😎'));
+    await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.LOADING)));
 
     if (!userId || !chatId) {
       await sendTelegramMessage(
         chatId,
-        escapeMarkdownV2('Não consegui identificar o teu utilizador. Tenta novamente! 🤔')
+        escapeMarkdownV2(getRandomMessage(MESSAGES.USER_NOT_FOUND))
       );
       return;
     }
@@ -65,15 +72,11 @@ export const handleMessage = async (message: any): Promise<void> => {
     await getOrCreateUser(db, userId, message.from);
 
     if (await isUserBlocked(db, userId)) {
-      await sendTelegramMessage(
-        chatId,
-        escapeMarkdownV2('🚫 Estás temporariamente bloqueado por enviar mensagens irrelevantes. Tenta novamente mais tarde.')
-      );
+      await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.USER_BLOCKED)));
       return;
     }
 
     const categories = await getAllCategories(db);
-
     const messageHistory = await getLastUserMessages(db, userId, 3);
     const pendingAlertFilters = await getPendingAlertFilters(db, userId);
 
@@ -85,12 +88,7 @@ export const handleMessage = async (message: any): Promise<void> => {
 
     const intent = await processUserMessage(SYSTEM_INSTRUCTIONS, userMessage);
 
-    /* console.log('Processed intent:', JSON.stringify(intent)); */
-
-    await sendTelegramMessage(
-      chatId,
-      escapeMarkdownV2(intent.responseMessage)
-    );
+    await sendTelegramMessage(chatId, escapeMarkdownV2(intent.responseMessage));
 
     await saveMessage(db, {
       userId,
@@ -103,7 +101,7 @@ export const handleMessage = async (message: any): Promise<void> => {
       await blockUser(db, userId, 24);
       await sendTelegramMessage(
         chatId,
-        escapeMarkdownV2('🚫 Detetámos que enviaste várias mensagens irrelevantes. Estás bloqueado temporariamente por 24 horas.')
+        escapeMarkdownV2(getRandomMessage(MESSAGES.USER_BLOCKED_24H))
       );
       return;
     }
@@ -111,7 +109,7 @@ export const handleMessage = async (message: any): Promise<void> => {
     switch (intent.type) {
       case IntentType.IRRELEVANT:
         await clearPendingAlertFilters(db, userId);
-        await sendTelegramMessage(chatId, intent.responseMessage);
+        await sendTelegramMessage(chatId, escapeMarkdownV2(intent.responseMessage));
         return;
 
       case IntentType.DELETE_ALERT: {
@@ -120,12 +118,15 @@ export const handleMessage = async (message: any): Promise<void> => {
         if (deletedCount === 0) {
           await sendTelegramMessage(
             chatId,
-            escapeMarkdownV2('Não encontrei alertas com esses critérios para apagar. 🤷')
+            escapeMarkdownV2(getRandomMessage(MESSAGES.ALERTS_NOT_FOUND))
           );
           return;
         }
 
-        await sendTelegramMessage(chatId, escapeMarkdownV2(`✅ ${deletedCount} alerta(s) apagado(s) com sucesso!`));
+        await sendTelegramMessage(
+          chatId,
+          escapeMarkdownV2(getRandomMessage(MESSAGES.ALERTS_DELETED(deletedCount)))
+        );
         return;
       }
 
@@ -143,7 +144,7 @@ export const handleMessage = async (message: any): Promise<void> => {
 
           await sendTelegramMessage(
             chatId,
-            escapeMarkdownV2('Acabei de criar o teu alerta e encontrei alguns produtos que correspondem aos teus critérios! Dá uma olhadela 👀')
+            escapeMarkdownV2(getRandomMessage(MESSAGES.ALERT_CREATED))
           );
 
           await clearPendingAlertFilters(db, userId);
@@ -158,6 +159,10 @@ export const handleMessage = async (message: any): Promise<void> => {
 
         if (newProducts.length > 0) {
           await clearPendingAlertFilters(db, userId);
+          await sendTelegramMessage(
+            chatId,
+            escapeMarkdownV2(getRandomMessage(MESSAGES.PRODUCTS_FOUND(newProducts.length)))
+          );
           for (const product of formatProductsForUser(newProducts)) {
             if (product.imageUrl) {
               await sendTelegramPhoto(chatId, product.imageUrl, product.text);
@@ -173,7 +178,9 @@ export const handleMessage = async (message: any): Promise<void> => {
 
           await sendTelegramMessage(
             chatId,
-            escapeMarkdownV2(`😔 Não encontrei produtos com esses critérios.\n\nQueres que crie um alerta para te notificar quando aparecerem produtos relacionados com "${intent.filters.searchQuery}"?`)
+            escapeMarkdownV2(
+              getRandomMessage(MESSAGES.PRODUCTS_NOT_FOUND(intent.filters.searchQuery || ''))
+            )
           );
           return;
         }
@@ -183,7 +190,7 @@ export const handleMessage = async (message: any): Promise<void> => {
     console.error('Error processing message:', error);
     await sendTelegramMessage(
       message.chat.id,
-      escapeMarkdownV2('Não consegui perceber a tua mensagem. Podes reformular? 🤔')
+      escapeMarkdownV2(getRandomMessage(MESSAGES.MESSAGE_NOT_UNDERSTOOD))
     );
     return;
   } finally {
