@@ -26,7 +26,7 @@ export const getSystemPrompt = (categories: string[], messageHistory: Message[] 
 
   SearchQuery: Only keywords. Strip verbs/stop words. (e.g., "promoções jogos xbox" -> "jogos xbox").
 
-  KeywordGroups: [[PT, ES, EN]] synonyms. Always include these 3 languages.
+  KeywordGroups: [[PT, ES, EN]] synonyms. Always include these 3 languages. Only one word per group. (e.g., [["celular", "móvil", "cellphone"], ["notebook", "portátil", "laptop"]]).
 
   No Verbiage: Output ONLY raw JSON. No markdown, no userMessage.
 
