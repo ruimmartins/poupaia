@@ -34,9 +34,7 @@ const autoScroll = async (page: Page, times: number = 5, intervalMs: number = 10
 
     await page.waitForTimeout(randomTimeout(intervalMs));
 
-    const reachedBottom = await page.evaluate(
-      () => window.scrollY + window.innerHeight >= document.body.scrollHeight
-    );
+    const reachedBottom = await page.evaluate(() => window.scrollY + window.innerHeight >= document.body.scrollHeight);
 
     if (reachedBottom) break;
   }
@@ -62,18 +60,14 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
         continue;
       }
 
-      const originalPrice =
-        buyingOption.price?.entity?.basisPrice?.moneyValueOrRange?.value?.amount;
-      const currentPrice = buyingOption.price?.entity?.priceToPay?.moneyValueOrRange?.value?.amount;
+      const originalPrice = parseFloat(buyingOption.price?.entity?.basisPrice?.moneyValueOrRange?.value?.amount ?? '0');
+      const currentPrice = parseFloat(buyingOption.price?.entity?.priceToPay?.moneyValueOrRange?.value?.amount ?? '0');
 
       if (!currentPrice || currentPrice <= 0) {
         continue;
       }
 
-      const discountPercentage =
-        originalPrice && currentPrice && originalPrice > 0
-          ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100)
-          : 0;
+      const discountPercentage = originalPrice && currentPrice && originalPrice > 0 ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0;
 
       if (discountPercentage < 10) {
         continue;
@@ -82,7 +76,7 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
       const asin = productEntity.asin;
       const title = productEntity.title?.entity?.displayString;
       const brand = productEntity.brandLogo?.entity?.logo?.entity?.altText;
-      const imageId = productEntity.productImages?.entity?.images?.[0]?.lowRes?.physicalId;
+      const imageId = productEntity.productImages?.entity?.images?.[0]?.hiRes?.physicalId;
 
       if (!asin || !title) {
         continue;
@@ -90,9 +84,7 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
 
       result.push({
         id: `AMAZON_${asin}`,
-        imageUrl: imageId
-          ? `https://m.media-amazon.com/images/I/${imageId}._AC_SF226,226_QL85_.jpg`
-          : 'https://via.placeholder.com/226',
+        imageUrl: imageId ? `https://m.media-amazon.com/images/I/${imageId}._AC_SF226,226_QL85_.jpg` : 'https://via.placeholder.com/226',
         title,
         brand,
         brandLevel: 0,
@@ -121,14 +113,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
   try {
     browser = await chromium.launch({
       headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-blink-features=AutomationControlled',
-        '--disable-dev-shm-usage',
-        '--disable-infobars',
-        '--window-size=1366,768',
-      ],
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled', '--disable-dev-shm-usage', '--disable-infobars', '--window-size=1366,768'],
     });
 
     const context = await browser.newContext({
@@ -153,9 +138,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
 
             const contentType = response.headers()['content-type'];
             if (!contentType.toLowerCase().includes('json')) {
-              console.log(
-                `Unexpected content type ${contentType} for ${response.url()}, skipping...`
-              );
+              console.log(`Unexpected content type ${contentType} for ${response.url()}, skipping...`);
               return;
             }
 
@@ -183,20 +166,14 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
     await clickLikeHuman(seeMoreButton);
     await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
 
-    const mainDepartmentsLocator = departmentsContainer.locator(
-      'div:first-child [role="radiogroup"] [data-testid^="filter-departments-"]'
-    );
-    await mainDepartmentsLocator
-      .first()
-      .waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
+    const mainDepartmentsLocator = departmentsContainer.locator('div:first-child [role="radiogroup"] [data-testid^="filter-departments-"]');
+    await mainDepartmentsLocator.first().waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
     const allMainDepartments = (await mainDepartmentsLocator.all()).slice(0, -1);
 
     // Dividir categorias entre tasks
-    const mainDepartments = allMainDepartments
-      .slice(1)
-      .filter((_, index) => index % totalTasks === taskIndex);
-    
-    if(process.env.DEVELOPMENT_MODE === 'true') {
+    const mainDepartments = allMainDepartments.slice(1).filter((_, index) => index % totalTasks === taskIndex);
+
+    if (process.env.DEVELOPMENT_MODE === 'true') {
       mainDepartments.splice(1); // Para desenvolvimento, limitar a 1 categoria principal (além de "Todas as categorias")
     }
 
@@ -207,12 +184,8 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
 
       await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
 
-      const subDepartmentsLocator = departmentsContainer.locator(
-        'div:nth-child(2) [role="radiogroup"] [data-testid^="filter-departments-"]'
-      );
-      await subDepartmentsLocator
-        .first()
-        .waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
+      const subDepartmentsLocator = departmentsContainer.locator('div:nth-child(2) [role="radiogroup"] [data-testid^="filter-departments-"]');
+      await subDepartmentsLocator.first().waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
       const subDepartments = await subDepartmentsLocator.all();
 
       for (const subFilter of subDepartments.slice(1)) {
@@ -230,19 +203,14 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
 
         page.off('response', responseListener);
 
-        const categoryButton = departmentsContainer
-          .getByRole('button', { name: categoryName, exact: true })
-          .first();
+        const categoryButton = departmentsContainer.getByRole('button', { name: categoryName, exact: true }).first();
         await categoryButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
         await clickLikeHuman(categoryButton);
         await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
       }
 
       try {
-        const breadcrumbButton = departmentsContainer
-          .getByTestId('breadcrumb')
-          .getByRole('button')
-          .first();
+        const breadcrumbButton = departmentsContainer.getByTestId('breadcrumb').getByRole('button').first();
         await breadcrumbButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
         await clickLikeHuman(breadcrumbButton);
         await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
@@ -259,9 +227,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
 
     await browser.close();
 
-    const uniqueProducts = Array.from(
-      new Map(products.map(product => [product.id, product])).values()
-    );
+    const uniqueProducts = Array.from(new Map(products.map(product => [product.id, product])).values());
 
     return uniqueProducts;
   } catch (error: any) {

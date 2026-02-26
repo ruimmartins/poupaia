@@ -1,5 +1,5 @@
-import { processUserMessage, getSystemPrompt, IntentType } from '@poupaia/ai';
 import { sendProductsToUser } from '@poupaia/shared';
+import { processUserMessage, getSystemPrompt, IntentType } from '@poupaia/ai';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
 import {
   closeConnection,
@@ -32,8 +32,6 @@ export const handleMessage = async (message: any): Promise<void> => {
     const messageHistory = await getLastUserMessages(db, userId, 3);
     const pendingAlertFilters = await getPendingAlertFilters(db, userId);
 
-    await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.LOADING)));
-
     if (!userId || !chatId) {
       await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.USER_NOT_FOUND)));
       return;
@@ -44,10 +42,12 @@ export const handleMessage = async (message: any): Promise<void> => {
       return;
     }
 
+    await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.LOADING)));
+
     const systemPrompt = getSystemPrompt(categories, messageHistory, pendingAlertFilters || undefined);
     const intent = await processUserMessage(systemPrompt, userMessage);
 
-    await sendTelegramMessage(chatId, escapeMarkdownV2(intent.responseMessage));
+    /* console.log('Detected intent:', intent); */
 
     await saveMessage(db, {
       userId,
@@ -67,7 +67,7 @@ export const handleMessage = async (message: any): Promise<void> => {
     switch (intent.type) {
       case IntentType.IRRELEVANT:
         await clearPendingAlertFilters(db, userId);
-        await sendTelegramMessage(chatId, escapeMarkdownV2(intent.responseMessage));
+        await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.IRRELEVANT_MESSAGE)));
         return;
 
       case IntentType.DELETE_ALERT: {

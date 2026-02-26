@@ -1,10 +1,8 @@
-import { Product, ProductFilters } from '@poupaia/db';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { AIResponse, IntentType, ProcessedMessage, ProductMessage } from './types';
+import { AIResponse, IntentType, ProcessedMessage } from './types';
 
 export const processUserMessage = async (systemInstruction: string, userMessage: string): Promise<ProcessedMessage> => {
   try {
-
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
     const model = genAI.getGenerativeModel({
@@ -26,7 +24,7 @@ export const processUserMessage = async (systemInstruction: string, userMessage:
     if (!parsed.isRelevant || !parsed.messageType) {
       return {
         type: IntentType.IRRELEVANT,
-        responseMessage: 'Desculpa, só posso ajudar-te a encontrar produtos e ofertas! 🛍️'
+        filters: {},
       };
     }
 
@@ -34,30 +32,16 @@ export const processUserMessage = async (systemInstruction: string, userMessage:
       parsed.filters = {};
     }
 
-    const filters: ProductFilters = {
-      limit: 10,
-      sortBy: 'createdAt',
-      sortOrder: 'desc',
-      ...parsed.filters,
-    };
-
     return {
       type: parsed.messageType,
-      filters,
-      responseMessage: parsed.userMessage
-    }
-
+      filters: parsed.filters,
+    };
   } catch (error) {
     console.error('Erro ao processar mensagem com Gemini:', error);
-    
+
     return {
       type: IntentType.SEARCH,
-      filters: {
-        limit: 10,
-        sortBy: 'discountPercentage',
-        sortOrder: 'desc'
-      },
-      responseMessage: 'A mostrar-te as melhores ofertas disponíveis! 🎯'
+      filters: {},
     };
-  } 
-}
+  }
+};

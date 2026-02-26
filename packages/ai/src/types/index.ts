@@ -21,7 +21,6 @@ export interface ProcessedMessage {
   keywordGroups?: string[][];
   maxPrice?: number;
   minDiscountPercent?: number;
-  responseMessage: string;
 }
 
 export interface ProductMessage {

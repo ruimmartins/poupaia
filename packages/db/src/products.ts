@@ -95,18 +95,9 @@ export const searchProducts = async (db: Db, searchQuery: string, filters: Parti
   }
 
   if (filters.keywordGroups && filters.keywordGroups.length > 0) {
-    const keywordConditions = filters.keywordGroups.map(group => {
-      const wordsNeedingBoundary = ['men', 'man', 'boy', 'girl', 'kid', 'baby', 'toddler', 'laptop', 'pc', 'computer'];
-
-      return {
-        $or: group.map(keyword => {
-          const needsBoundary = wordsNeedingBoundary.includes(keyword.toLowerCase());
-          const pattern = needsBoundary ? `\\b${keyword}\\b` : keyword;
-
-          return { title: { $regex: pattern, $options: 'i' } };
-        }),
-      };
-    });
+    const keywordConditions = filters.keywordGroups.map(group => ({
+      $or: group.map(keyword => ({ title: { $regex: `\\b${keyword}\\b`, $options: 'i' } })),
+    }));
 
     andConditions.push(...keywordConditions);
   }
@@ -115,6 +106,8 @@ export const searchProducts = async (db: Db, searchQuery: string, filters: Parti
     query.$and = andConditions;
   }
 
+  /* console.log('Constructed MongoDB query:', JSON.stringify(query, null, 2)); */
+
   const results = await collection
     .find(
       query /* , {
@@ -122,7 +115,7 @@ export const searchProducts = async (db: Db, searchQuery: string, filters: Parti
     } */
     )
     .sort({ score: { $meta: 'textScore' }, brandLevel: -1 })
-    .limit(filters.limit || 20)
+    .limit(10)
     .toArray();
 
   return results;
