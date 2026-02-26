@@ -3,8 +3,8 @@ import path from 'path';
 import { existsSync } from 'fs';
 import { Listr } from 'listr2';
 import { sendProductsToUser } from '@poupaia/shared';
-import { connectToDatabase, closeConnection, getActiveAlerts, updateAlertLastChecked, updateAlertLastTriggered, getUserSentProducts, markProductsAsSentToUser, searchAndFilterProducts } from '@poupaia/db';
-import { sendTelegramMessage, formatProductsForUser, getRandomMessage, MESSAGES, escapeMarkdownV2 } from '@poupaia/messaging';
+import { connectToDatabase, closeConnection, getActiveAlerts, updateAlertLastChecked, updateAlertLastTriggered, searchAndFilterProducts, Alert } from '@poupaia/db';
+import { sendTelegramMessage, getRandomMessage, MESSAGES, escapeMarkdownV2 } from '@poupaia/messaging';
 
 const envPath = path.resolve(__dirname, '../.env');
 if (existsSync(envPath)) {
@@ -47,11 +47,9 @@ const main = async () => {
 
         for (const alert of ctx.alerts) {
           try {
-            const newProducts = await searchAndFilterProducts(ctx.db, alert.userId, alert.searchQuery, alert.filters);
+            const newProducts = await searchAndFilterProducts(ctx.db, alert.userId, { ...alert });
 
             if (newProducts.length > 0) {
-              const messages = formatProductsForUser(newProducts);
-
               await sendTelegramMessage(alert.chatId.toString(), escapeMarkdownV2(getRandomMessage(MESSAGES.ALERT_TRIGGERED(newProducts.length, alert.searchQuery))));
 
               await sendProductsToUser(ctx.db, alert.userId, alert.chatId, newProducts);

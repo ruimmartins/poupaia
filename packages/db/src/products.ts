@@ -63,11 +63,11 @@ export const deleteInvalidProducts = async (db: Db) => {
   });
 };
 
-export const searchProducts = async (db: Db, searchQuery: string, filters: Partial<ProductFilters> = {}): Promise<Product[]> => {
+export const searchProducts = async (db: Db, filters: Partial<ProductFilters> = {}): Promise<Product[]> => {
   const collection = await getProductsCollection(db);
 
   const query: any = {
-    $text: { $search: searchQuery },
+    $text: { $search: filters.searchQuery },
   };
 
   const andConditions: any[] = [];
@@ -109,11 +109,7 @@ export const searchProducts = async (db: Db, searchQuery: string, filters: Parti
   /* console.log('Constructed MongoDB query:', JSON.stringify(query, null, 2)); */
 
   const results = await collection
-    .find(
-      query /* , {
-      projection: { score: { $meta: 'textScore' }, brandLevel: 1 },
-    } */
-    )
+    .find(query)
     .sort({ score: { $meta: 'textScore' }, brandLevel: -1 })
     .limit(10)
     .toArray();
@@ -121,9 +117,9 @@ export const searchProducts = async (db: Db, searchQuery: string, filters: Parti
   return results;
 };
 
-export const searchAndFilterProducts = async (db: Db, userId: number, searchQuery: string, filters: Partial<ProductFilters>) => {
+export const searchAndFilterProducts = async (db: Db, userId: number, filters: Partial<ProductFilters>) => {
   const userSentProductIds = await getUserSentProducts(db, userId);
-  const allProducts = await searchProducts(db, searchQuery, filters);
+  const allProducts = await searchProducts(db, filters);
 
   return allProducts.filter(p => !userSentProductIds.includes(p.id));
 };

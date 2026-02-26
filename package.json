@@ -6,7 +6,6 @@
   "scripts": {
     "build": "pnpm -r --filter=@poupaia/* run build",
     "scraper": "ts-node apps/scraper/src/index.ts",
-    "maintain-database": "ts-node apps/tasks/src/maintain-database.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

@@ -83,7 +83,7 @@ export const handleMessage = async (message: any): Promise<void> => {
       }
 
       case IntentType.SEARCH:
-        const newProducts = await searchAndFilterProducts(db, userId, intent.filters.searchQuery || '', intent.filters);
+        const newProducts = await searchAndFilterProducts(db, userId, intent.filters);
 
         if (newProducts.length > 0) {
           await clearPendingAlertFilters(db, userId);
@@ -110,7 +110,7 @@ export const handleMessage = async (message: any): Promise<void> => {
 
         await clearPendingAlertFilters(db, userId);
 
-        const newProducts = await searchAndFilterProducts(db, userId, intent.filters.searchQuery || '', intent.filters);
+        const newProducts = await searchAndFilterProducts(db, userId, intent.filters);
 
         if (newProducts.length > 0) {
           await clearPendingAlertFilters(db, userId);
