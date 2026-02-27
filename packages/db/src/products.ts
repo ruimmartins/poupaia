@@ -15,22 +15,22 @@ export const createOrUpdateProducts = async (db: Db, products: Product[]) => {
 
   const brands = content.split(',').map(brand => brand.trim());
 
-  const bulkOps = products.map(product => {
-    const { createdAt, ...productWithoutCreatedAt } = product;
+  const bulkOps = products
+    .filter(product => brands.includes(product.brand ?? 'not a brand'))
+    .map(product => {
+      const { createdAt, ...productWithoutCreatedAt } = product;
 
-    productWithoutCreatedAt.brandLevel = brands.includes(product.brand ?? 'not a brand') ? 1 : 0;
-
-    return {
-      updateOne: {
-        filter: { id: product.id },
-        update: {
-          $set: productWithoutCreatedAt,
-          $setOnInsert: { createdAt },
+      return {
+        updateOne: {
+          filter: { id: product.id },
+          update: {
+            $set: productWithoutCreatedAt,
+            $setOnInsert: { createdAt },
+          },
+          upsert: true,
         },
-        upsert: true,
-      },
-    };
-  });
+      };
+    });
 
   return await collection.bulkWrite(bulkOps);
 };
@@ -57,6 +57,11 @@ export const deleteInvalidProducts = async (db: Db) => {
       {
         expiresAt: {
           $lt: now.toISOString(),
+        },
+      },
+      {
+        brandLevel: {
+          $eq: 0,
         },
       },
     ],
