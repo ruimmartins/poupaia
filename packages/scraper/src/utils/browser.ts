@@ -7,7 +7,7 @@ export const getBrowser = async (): Promise<{ browser: Browser; page: Page }> =>
   chromium.use(stealth());
 
   const browser = await chromium.launch({
-    headless: false,
+    headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled', '--disable-dev-shm-usage', '--disable-infobars', '--window-size=1366,768'],
   });
 

@@ -141,7 +141,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
     const allMainDepartments = (await mainDepartmentsLocator.all()).slice(0, -1);
 
     // Dividir categorias entre tasks
-    const mainDepartments = allMainDepartments.slice(1).filter((_, index) => index % totalTasks === taskIndex);
+    const mainDepartments = allMainDepartments.slice(1);
 
     for (const filter of mainDepartments) {
       const categoryName = await filter.innerText();
