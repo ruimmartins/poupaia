@@ -73,9 +73,9 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
 export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1) => {
   const { page, browser } = await getBrowser();
 
-  try {
-    const products: Product[] = [];
+  const products: Product[] = [];
 
+  try {
     const createResponseListener = (category: string, subcategory: string) => {
       return async (response: any) => {
         if (PROMOTIONS_REGEX.test(response.url())) {
@@ -169,7 +169,6 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
 
         let checkboxesClicked = [];
         const brandsCheckbox = await departmentsContainer.locator('div[data-csa-c-element-id^="filter-brands"]').all();
-        console.log(`Found ${brandsCheckbox.length} brand checkboxes for ${categoryName} > ${subcategoryName}`);
 
         for (const checkbox of brandsCheckbox) {
           const value = await checkbox.getAttribute('data-csa-c-element-id');
@@ -232,6 +231,6 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
       }
     }
 
-    return [];
+    return products;
   }
 };
