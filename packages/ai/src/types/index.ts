@@ -1,29 +1,17 @@
-import type { ProductFilters } from '@poupaia/db';
-
-export enum IntentType {
+export enum IdleIntentTypeEnum {
   IRRELEVANT = 'irrelevant',
-  ALERT = 'alert',
   SEARCH = 'search',
-  DELETE_ALERT = 'delete_alert',
+  GIFT = 'gift',
 }
 
-export interface AIResponse {
-  isRelevant: boolean;
-  messageType: IntentType;
-  filters: any;
-  userMessage: string;
+export enum BrowsingIntentTypeEnum {
+  MORE_INFO = 'more_info',
+  MORE_PRODUCTS = 'more_products',
+  IRRELEVANT = 'irrelevant',
 }
 
-export interface ProcessedMessage {
-  type: IntentType;
-  filters?: ProductFilters;
-  categories?: string[];
-  keywordGroups?: string[][];
-  maxPrice?: number;
-  minDiscountPercent?: number;
-}
-
-export interface ProductMessage {
-  text: string;
-  imageUrl?: string;
+export enum InterestsIntentTypeEnum {
+  ADD_INTERESTS = 'add_interests',
+  REMOVE_INTERESTS = 'remove_interests',
+  IRRELEVANT = 'irrelevant',
 }

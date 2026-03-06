@@ -1,8 +1,8 @@
 {
-  "name": "scraper",
+  "name": "@poupaia/scraper-app",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "src/index.ts",
   "scripts": {
     "start": "ts-node src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -13,9 +13,9 @@
   "packageManager": "pnpm@10.29.3",
   "dependencies": {
     "@poupaia/db": "workspace:*",
+    "@poupaia/scraper": "workspace:*",
     "dotenv": "^17.3.1",
     "listr2": "^10.1.0",
-    "playwright": "^1.58.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

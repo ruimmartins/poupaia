@@ -1,17 +1,22 @@
-import { ProductFilters } from '../types';
+interface Profile {
+  firstName?: string;
+  lastName?: string;
+  username?: string;
+  language?: 'pt' | 'en';
+  interests?: string[];
+}
+
+export enum UserStateEnum {
+  IDLE = 'idle',
+  BROWSING = 'browsing',
+  SETTING_INTERESTS = 'setting_interests',
+}
 
 export interface User {
   id: number;
   createdAt: string;
-  isActive: boolean;
+  lastInteractionAt: string;
   blockedUntil?: string;
-  sentProductIds?: string[];
-  pendingAlertFilters?: ProductFilters;
-  profile: {
-    firstName?: string;
-    lastName?: string;
-    username?: string;
-    language?: 'pt' | 'en';
-    interests?: string[];
-  };
+  state: UserStateEnum;
+  profile: Profile;
 }

@@ -1,0 +1,26 @@
+export const QUESTIONS = {
+  MORE_PRODUCTS_AVAILABLE: [
+    'Queres ver mais produtos? 👀',
+    'Mostro-te mais alguma coisa? 🛒',
+    'Há mais onde veio esse! Queres ver? 😏',
+    'Ainda há mais produtos em stock... Queres espreitar? 🔍',
+    'Não ficaste satisfeito? Tenho mais! 😄',
+    'Queres continuar à caça de pechinchas? 🏹',
+    'Há mais produtos à espera de ti! Vais querer ver? 🎁',
+    'Posso mostrar mais, é só pedir! 😉',
+    'Ainda não chegou? Tenho mais onde isso veio! 🚀',
+    'Tenho mais produtos! Queres ver? 💪',
+  ],
+  MORE_SUGGESTIONS: [
+    'Queres mais sugestões? 🤔',
+    'Não ficaste convencido? Tenho mais ideias! 💡',
+    'Queres que continue à procura? 🕵️‍♂️',
+    'Posso sugerir mais coisas! Queres? 😊',
+    'Ainda à procura do presente perfeito? Tenho mais! 🎯',
+    'Não desisto! Queres mais sugestões? 💪',
+    'Há mais ideias no meu baú! Queres ver? 🧳',
+    'Posso continuar a pesquisar! Queres mais? 🔄',
+    'Ainda não é o ideal? Deixa-me pensar mais! 🧠',
+    'Tenho mais sugestões na manga! Queres? 🃏',
+  ],
+};

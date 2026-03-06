@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { AIResponse, IntentType, ProcessedMessage } from './types';
 
-export const processUserMessage = async (systemInstruction: string, userMessage: string): Promise<ProcessedMessage> => {
+export const processUserMessage = async <T>(systemInstruction: string, userMessage: string): Promise<T> => {
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
@@ -19,29 +18,12 @@ export const processUserMessage = async (systemInstruction: string, userMessage:
       throw new Error('Formato de resposta inválido do Gemini');
     }
 
-    const parsed: AIResponse = JSON.parse(jsonMatch[0]);
+    const parsed: T = JSON.parse(jsonMatch[0]);
 
-    if (!parsed.isRelevant || !parsed.messageType) {
-      return {
-        type: IntentType.IRRELEVANT,
-        filters: {},
-      };
-    }
-
-    if (!parsed.filters) {
-      parsed.filters = {};
-    }
-
-    return {
-      type: parsed.messageType,
-      filters: parsed.filters,
-    };
+    return parsed;
   } catch (error) {
     console.error('Erro ao processar mensagem com Gemini:', error);
 
-    return {
-      type: IntentType.SEARCH,
-      filters: {},
-    };
+    return { error: true, message: (error as Error).message } as T;
   }
 };

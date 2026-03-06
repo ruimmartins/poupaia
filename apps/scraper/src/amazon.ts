@@ -1,44 +1,7 @@
-import { chromium, Locator, Page } from 'playwright';
-import { Product } from '@poupaia/db';
+import { Product, brands } from '@poupaia/db';
+import { getBrowser, autoScroll, clickLikeHuman, randomTimeout, WAIT_FOR_NAVIGATION_TIMEOUT, WAIT_FOR_NETWORK_IDLE_TIMEOUT, WAIT_FOR_SELECTOR_TIMEOUT } from '@poupaia/scraper';
 
 const PROMOTIONS_REGEX = /\/api\/marketplaces\/.*\/promotions/;
-
-const IS_CI = process.env.CI === 'true';
-const WAIT_FOR_CLICK_TIMEOUT = IS_CI ? 200 : 300;
-const WAIT_FOR_SELECTOR_TIMEOUT = IS_CI ? 4000 : 2500;
-const WAIT_FOR_NAVIGATION_TIMEOUT = IS_CI ? 6000 : 4000;
-const WAIT_FOR_NETWORK_IDLE_TIMEOUT = IS_CI ? 7500 : 5000;
-
-const randomTimeout = (value: number) => (Math.random() + 0.5) * value;
-
-function getRandomUserAgent() {
-  const agents = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
-  ];
-  return agents[Math.floor(Math.random() * agents.length)];
-}
-
-const clickLikeHuman = async (element: Locator) => {
-  await new Promise(resolve => setTimeout(resolve, randomTimeout(WAIT_FOR_CLICK_TIMEOUT)));
-  await element.click();
-};
-
-const autoScroll = async (page: Page, times: number = 5, intervalMs: number = 1000) => {
-  for (let i = 0; i < times; i++) {
-    const amountPxScrolled = Math.random() * 300 + 200;
-    await page.evaluate(amount => {
-      window.scrollBy(0, amount);
-    }, amountPxScrolled);
-
-    await page.waitForTimeout(randomTimeout(intervalMs));
-
-    const reachedBottom = await page.evaluate(() => window.scrollY + window.innerHeight >= document.body.scrollHeight);
-
-    if (reachedBottom) break;
-  }
-};
 
 const parseProductData = (data: any, currentCategory: string): Product[] => {
   const result: Product[] = [];
@@ -108,23 +71,10 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
 };
 
 export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1) => {
-  let browser;
+  const { page, browser } = await getBrowser();
 
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-blink-features=AutomationControlled', '--disable-dev-shm-usage', '--disable-infobars', '--window-size=1366,768'],
-    });
-
-    const context = await browser.newContext({
-      viewport: { width: 1366, height: 768 },
-      locale: 'pt-PT',
-      timezoneId: 'Europe/Lisbon',
-      userAgent: getRandomUserAgent(),
-    });
-
     const products: Product[] = [];
-    const page = await context.newPage();
 
     const createResponseListener = (category: string, subcategory: string) => {
       return async (response: any) => {
@@ -157,6 +107,19 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
       timeout: 60000,
     });
 
+    const cookieForm = page.locator('form[role="dialog"]');
+    await cookieForm.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
+
+    const acceptButton = cookieForm
+      .locator('span', {
+        hasText: 'Aceitar',
+      })
+      .first();
+    await acceptButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
+    await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+    await clickLikeHuman(acceptButton);
+    await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+
     const departmentsContainer = page.locator('[data-tabulation-id="desktop-refinements"]');
 
     const seeMoreButton = departmentsContainer.locator('div:first-child a', {
@@ -166,16 +129,19 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
     await clickLikeHuman(seeMoreButton);
     await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
 
+    const seeMoreBrandsButton = departmentsContainer.locator('div:nth-child(2) a', {
+      hasText: 'Ver mais',
+    });
+    await seeMoreBrandsButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
+    await clickLikeHuman(seeMoreBrandsButton);
+    await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+
     const mainDepartmentsLocator = departmentsContainer.locator('div:first-child [role="radiogroup"] [data-testid^="filter-departments-"]');
     await mainDepartmentsLocator.first().waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
     const allMainDepartments = (await mainDepartmentsLocator.all()).slice(0, -1);
 
     // Dividir categorias entre tasks
     const mainDepartments = allMainDepartments.slice(1).filter((_, index) => index % totalTasks === taskIndex);
-
-    if (process.env.DEVELOPMENT_MODE === 'true') {
-      mainDepartments.splice(1); // Para desenvolvimento, limitar a 1 categoria principal (além de "Todas as categorias")
-    }
 
     for (const filter of mainDepartments) {
       const categoryName = await filter.innerText();
@@ -200,6 +166,31 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
         await autoScroll(page, 10, 500);
         await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
         await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+
+        let checkboxesClicked = [];
+        const brandsCheckbox = await departmentsContainer.locator('div[data-csa-c-element-id^="filter-brands"]').all();
+        console.log(`Found ${brandsCheckbox.length} brand checkboxes for ${categoryName} > ${subcategoryName}`);
+
+        for (const checkbox of brandsCheckbox) {
+          const value = await checkbox.getAttribute('data-csa-c-element-id');
+          if (value && brands.includes(value.replace('filter-brands-', ''))) {
+            checkboxesClicked.push(checkbox);
+            await clickLikeHuman(checkbox);
+            await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+            await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+          }
+        }
+
+        if (checkboxesClicked.length > 0) {
+          await autoScroll(page, 10, 500);
+          await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+          await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+          for (const checkbox of checkboxesClicked) {
+            await clickLikeHuman(checkbox);
+            await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+            await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+          }
+        }
 
         page.off('response', responseListener);
 

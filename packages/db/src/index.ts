@@ -1,9 +1,11 @@
 // Connection
 export * from './connection';
-export * from './products';
-export * from './alerts';
+export * from './product';
 export * from './messages';
-export * from './users';
+export * from './user';
+export * from './activities';
 
 // Types
-export * from './types';
+export * from './models';
+
+export * from './helpers/files/good-brands';

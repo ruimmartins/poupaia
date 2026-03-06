@@ -11,7 +11,7 @@ env:
   REGION: europe-west1
   GAR_LOCATION: europe-west1
   REPOSITORY: poupaia-repo
-  
+
 jobs:
   deploy-bot:
     runs-on: ubuntu-latest
@@ -42,21 +42,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and Push Bot
+      - name: Build and Push API
         uses: 'docker/build-push-action@v5'
         with:
           context: .
-          file: apps/bot/Dockerfile
+          file: apps/api/Dockerfile
           push: true
-          tags: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/bot:${{ github.sha }}
+          tags: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:${{ github.sha }}
           cache-from: type=gha # Usa o cache nativo do GitHub Actions
           cache-to: type=gha,mode=max
 
-      - name: Deploy Bot Service
+      - name: Deploy API Service
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: poupaia-bot
-          image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/bot:${{ github.sha }}
+          image: ${{ env.GAR_LOCATION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api:${{ github.sha }}
           region: ${{ env.REGION }}
           env_vars: |
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}

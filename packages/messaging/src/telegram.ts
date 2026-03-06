@@ -1,11 +1,10 @@
 import { Product } from '@poupaia/db';
-import { ProductMessage } from '@poupaia/ai';
+import { BrowsingResponse } from '@poupaia/ai';
+import { TelegramMessage } from './types/telegram-message';
 
 // Função de escape robusta para MarkdownV2
 export const escapeMarkdownV2 = (text: string | number): string => {
-  return text
-    .toString()
-    .replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+  return text.toString().replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
 };
 
 export const sendTelegramMessage = async (chat_id: string | number, text: string) => {
@@ -49,11 +48,10 @@ export const sendTelegramPhoto = async (chat_id: string | number, photoUrl: stri
   }
 };
 
-export const formatProductsForUser = (products: Product[]): ProductMessage[] => {
-  const messages: ProductMessage[] = [];
+export const formatProductsForUser = (products: Product[]): TelegramMessage[] => {
+  const messages: TelegramMessage[] = [];
 
   for (const product of products) {
-
     const currentPrice = typeof product.currentPrice === 'string' ? parseFloat(product.currentPrice) : (product.currentPrice ?? 0);
     const originalPrice = typeof product.originalPrice === 'string' ? parseFloat(product.originalPrice) : (product.originalPrice ?? 0);
 
@@ -63,7 +61,7 @@ export const formatProductsForUser = (products: Product[]): ProductMessage[] => 
     }
 
     const emoji = discount >= 60 ? '🔥' : discount >= 40 ? '⚡' : '💰';
-    
+
     const safeTitle = escapeMarkdownV2(product.title);
     const safeOldPrice = escapeMarkdownV2(originalPrice.toFixed(2));
     const safeNewPrice = escapeMarkdownV2(currentPrice.toFixed(2));
@@ -92,4 +90,13 @@ export const formatProductsForUser = (products: Product[]): ProductMessage[] => 
   }
 
   return messages;
+};
+
+export const formatMoreInfoMessage = (product: Product, intent: BrowsingResponse['intent']): TelegramMessage => {
+  let message = '';
+
+  return {
+    text: message,
+    imageUrl: product.imageUrl,
+  };
 };

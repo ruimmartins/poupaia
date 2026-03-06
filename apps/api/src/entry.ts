@@ -1,0 +1,79 @@
+import { handleIdleWorkflow } from './workflows/idle';
+import { handleBrowsingWorkflow } from './workflows/browsing';
+import { handleInterestsWorkflow } from './workflows/interests';
+import { closeConnection, connectToDatabase, getLastActivity, getOrCreateUser, getUnprocessedMessagesForUser, saveMessage } from '@poupaia/db';
+import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
+import { UserStateEnum } from 'packages/db/src/models/user';
+import { processUserMessage, relatedMessagesPrompt } from '@poupaia/ai';
+
+export const handleRequest = async (message: any): Promise<void> => {
+  const userId = message.from?.id;
+  const chatId = message.chat?.id;
+  console.log(`[handleRequest] Start userId=${userId} chatId=${chatId} text="${message.text}"`);
+
+  try {
+    const db = await connectToDatabase();
+    console.log('[handleRequest] DB connected');
+
+    const user = await getOrCreateUser(db, userId);
+    console.log(`[handleRequest] User state=${user.state} userId=${userId}`);
+
+    await saveMessage(db, {
+      id: null,
+      type: 'user',
+      userId,
+      text: message.text,
+      timestamp: new Date(),
+      processed: false,
+    });
+    console.log('[handleRequest] Message saved, waiting debounce...');
+
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    const unprocessedMessages = await getUnprocessedMessagesForUser(db, userId);
+    console.log(`[handleRequest] Unprocessed messages count=${unprocessedMessages.length}`);
+
+    const lastMessage = unprocessedMessages.at(-1);
+    if (lastMessage?.timestamp && new Date().getTime() - new Date(lastMessage.timestamp).getTime() < 5000) {
+      console.log('[handleRequest] Newer message detected — skipping this one');
+      return;
+    }
+
+    console.log(`[handleRequest] Routing to workflow for state=${user.state}`);
+    switch (user.state) {
+      case UserStateEnum.SETTING_INTERESTS:
+        await handleInterestsWorkflow(db, chatId, user, unprocessedMessages);
+        break;
+      case UserStateEnum.IDLE:
+        await handleIdleWorkflow(db, chatId, userId, unprocessedMessages);
+        break;
+      case UserStateEnum.BROWSING:
+        const lastActivity = await getLastActivity(db, userId);
+        console.log(`[handleRequest] Last activity found=${!!lastActivity} productsSent=${lastActivity?.productsSent?.length ?? 0}`);
+
+        const lastActivityMessages = lastActivity?.messages.map(m => m.text) || [];
+        const isMessageRelatedToLastActivity = await processUserMessage<{ related: boolean }>(relatedMessagesPrompt(lastActivityMessages), unprocessedMessages.map(m => m.text).join(', '));
+        console.log(`[handleRequest] Message related to last activity=${isMessageRelatedToLastActivity.related}`);
+
+        if (!isMessageRelatedToLastActivity.related) {
+          await handleIdleWorkflow(db, chatId, userId, unprocessedMessages);
+        } else {
+          await handleBrowsingWorkflow(db, chatId, user, lastActivity, unprocessedMessages);
+        }
+        break;
+      default:
+        console.warn(`[handleRequest] Unknown state=${user.state} — sending fallback message`);
+        await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.SOMETHING_WENT_WRONG)));
+    }
+
+    console.log('[handleRequest] Done');
+    return;
+  } catch (error) {
+    console.error('[handleRequest] Error processing message:', error);
+    await sendTelegramMessage(message.chat.id, escapeMarkdownV2(getRandomMessage(MESSAGES.SOMETHING_WENT_WRONG)));
+    return;
+  } finally {
+    await closeConnection();
+    console.log('[handleRequest] DB connection closed');
+  }
+};
