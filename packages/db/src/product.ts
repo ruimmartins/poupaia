@@ -54,11 +54,6 @@ export const deleteInvalidProducts = async (db: Db) => {
           $lt: now.toISOString(),
         },
       },
-      {
-        brandLevel: {
-          $eq: 0,
-        },
-      },
     ],
   });
 };

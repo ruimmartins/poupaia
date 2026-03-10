@@ -3,7 +3,7 @@ import path from 'path';
 import { existsSync } from 'fs';
 import { Listr } from 'listr2';
 import { scrapAmazon } from './amazon';
-import { connectToDatabase, closeConnection, Product, createOrUpdateProducts } from '@poupaia/db';
+import { connectToDatabase, closeConnection, Product, createOrUpdateProducts, deleteInvalidProducts } from '@poupaia/db';
 
 // Carregar .env da pasta apps/scraper (apenas em desenvolvimento local)
 const envPath = path.resolve(__dirname, '../.env');
@@ -69,6 +69,13 @@ const main = async () => {
         const result = await createOrUpdateProducts(ctx.db, products);
 
         task.title = `${result.upsertedCount} novos, ${result.modifiedCount} atualizados (${products.length} total)`;
+      },
+    },
+    {
+      title: 'A apagar produtos antigos do MongoDB',
+      task: async (ctx, task) => {
+        const result = await deleteInvalidProducts(ctx.db);
+        task.title = `${result.deletedCount} produtos antigos apagados`;
       },
     },
   ]);
