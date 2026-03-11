@@ -3,7 +3,6 @@ interface Profile {
   lastName?: string;
   username?: string;
   language?: 'pt' | 'en';
-  interests?: string[];
 }
 
 export enum UserStateEnum {
@@ -15,8 +14,8 @@ export enum UserStateEnum {
 export interface User {
   id: number;
   createdAt: string;
-  lastInteractionAt: string;
-  blockedUntil?: string;
   state: UserStateEnum;
   profile: Profile;
+  queries?: string[];
+  chatId: number;
 }

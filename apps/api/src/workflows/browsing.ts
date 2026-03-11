@@ -1,12 +1,16 @@
-import { User, Message, Activity, searchProducts, updateUserState } from '@poupaia/db';
+import { User, Message, Activity, searchProducts, createOrUpdateActivity } from '@poupaia/db';
 import { browsingPrompt, BrowsingIntentTypeEnum, processUserMessage, BrowsingResponse } from '@poupaia/ai';
-import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage, formatProductsForUser, sendTelegramPhoto, QUESTIONS, formatMoreInfoMessage } from '@poupaia/messaging';
-import { UserStateEnum } from 'packages/db/src/models/user';
+import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage, sendTelegramPhoto, formatMoreInfoMessage } from '@poupaia/messaging';
+import { sendProductsToUser } from '@poupaia/shared';
+import { Db } from 'mongodb';
 
-export const handleBrowsingWorkflow = async (db: any, chatId: number, user: User, lastActivity: Activity | null, unprocessedMessages: Message[]): Promise<void> => {
-  console.log(`[browsingWorkflow] Start chatId=${chatId} userId=${user.id} messages=${unprocessedMessages.length}`);
+export const handleBrowsingWorkflow = async (db: Db, chatId: number, user: User, lastActivity: Activity | null, messages: Message[]): Promise<void> => {
+  console.log(`[browsingWorkflow] Start chatId=${chatId} userId=${user.id} messages=${messages.length}`);
 
-  const { type, intent } = await processUserMessage<BrowsingResponse>(browsingPrompt(lastActivity?.productsSent || []), unprocessedMessages.map(m => m.text).join(', '));
+  const { type, intent } = await processUserMessage<BrowsingResponse>(
+    browsingPrompt(lastActivity?.productsSent || []),
+    messages.map(m => ({ role: m.type === 'user' ? 'user' : 'model', content: m.text }))
+  );
   console.log(`[browsingWorkflow] AI result type=${type} intent=${JSON.stringify(intent)}`);
 
   switch (type) {
@@ -25,28 +29,20 @@ export const handleBrowsingWorkflow = async (db: any, chatId: number, user: User
 
     case BrowsingIntentTypeEnum.MORE_PRODUCTS:
       console.log(`[browsingWorkflow] MORE_PRODUCTS searching with intent=${JSON.stringify(lastActivity?.intent)}`);
-      const products = await searchProducts(db, lastActivity?.intent);
+      const products = await searchProducts(
+        db,
+        lastActivity?.intent,
+        lastActivity?.productsSent?.map(p => p.id)
+      );
       console.log(`[browsingWorkflow] Products found=${products.length}`);
       if (products.length > 0) {
         await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.PRODUCTS_FOUND(products.length))));
 
-        const productMessages = formatProductsForUser(products.slice(0, 5));
-        for (const message of productMessages) {
-          if (message.imageUrl) {
-            await sendTelegramPhoto(chatId, message.imageUrl, message.text);
-          } else {
-            await sendTelegramMessage(chatId, message.text);
-          }
-        }
+        const productsToSend = products.slice(0, 5);
 
-        await updateUserState(db, user.id, UserStateEnum.BROWSING);
-        console.log('[browsingWorkflow] User state kept as BROWSING');
+        await sendProductsToUser(db, user.id, chatId, productsToSend);
 
-        if (products.length < 5) {
-          await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.NO_MORE_PRODUCTS)));
-        } else {
-          await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(QUESTIONS.MORE_PRODUCTS_AVAILABLE)));
-        }
+        if (lastActivity) await createOrUpdateActivity(db, { ...lastActivity, productsSent: [...(lastActivity.productsSent || []), ...productsToSend] });
       } else {
         console.log('[browsingWorkflow] No products found for intent');
       }

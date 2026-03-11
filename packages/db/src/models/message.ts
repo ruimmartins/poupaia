@@ -1,6 +1,6 @@
 export interface Message {
   id: string | null;
-  type: 'user' | 'bot';
+  type: 'user' | 'model';
   userId: number;
   text: string;
   timestamp: Date;

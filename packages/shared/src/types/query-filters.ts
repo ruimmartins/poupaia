@@ -1,6 +1,6 @@
 export interface QueryFilters {
   // Pesquisa orgânica
-  query?: string[]; // Query de pesquisa orgânica (usado com text search)
+  query: string; // Query de pesquisa orgânica (usado com text search)
 
   // Filtros de preço
   minPrice?: number;
@@ -10,9 +10,11 @@ export interface QueryFilters {
   minDiscount?: number; // Exemplo: 30 (para 30% ou mais)
 
   // Filtros de categoria
-  categories?: string[]; // Array de categorias
+  categories: string[]; // Array de categorias
+
+  // Filtros de data
+  minCreatedAt?: string; // ISO date string (e.g., "2025-01-01T00:00:00Z")
+  maxCreatedAt?: string; // ISO date string
 
   keywordGroups?: string[][];
-
-  excludeIds?: string[]; // IDs de produtos a excluir dos resultados
 }

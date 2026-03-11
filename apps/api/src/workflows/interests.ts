@@ -1,8 +1,9 @@
 import { User, Message } from '@poupaia/db';
 import { idlePrompt, InterestsIntentTypeEnum, processUserMessage } from '@poupaia/ai';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
+import { Db } from 'mongodb';
 
-export const handleInterestsWorkflow = async (db: any, chatId: number, user: User, messages: Message[]): Promise<void> => {
+export const handleInterestsWorkflow = async (db: Db, chatId: number, user: User, messages: Message[]): Promise<void> => {
   console.log(`[interestsWorkflow] Start chatId=${chatId} userId=${user.id} messages=${messages.length}`);
 
   /* const { type, intent } = await processUserMessage(idlePrompt, userMessage); */

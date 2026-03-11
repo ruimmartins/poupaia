@@ -16,5 +16,5 @@ export const saveMessage = async (db: Db, message: Message): Promise<void> => {
 
 export const setMessegesAsProcessed = async (db: Db, messageIds: any[]): Promise<void> => {
   const messagesCollection = await getMessagesCollection(db);
-  await messagesCollection.updateMany({ _id: { $in: messageIds } }, { $set: { processed: true } });
+  await messagesCollection.updateMany({ id: { $in: messageIds } }, { $set: { processed: true } });
 };

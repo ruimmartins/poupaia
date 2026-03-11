@@ -58,34 +58,34 @@ export const deleteInvalidProducts = async (db: Db) => {
   });
 };
 
-export const searchProducts = async (db: Db, filters: Partial<QueryFilters> = {}): Promise<Product[]> => {
+export const searchProducts = async (db: Db, filters: Partial<QueryFilters> = {}, excludeProducts?: string[]): Promise<Product[]> => {
   const collection = await getProductsCollection(db);
 
   const query: any = {
-    $text: { $search: (filters.query ?? []).join(' ') },
+    $text: { $search: filters.query },
   };
 
   const andConditions: any[] = [];
 
-  if (filters.excludeIds && filters.excludeIds.length > 0) {
-    query.id = { $nin: filters.excludeIds };
+  if (excludeProducts && excludeProducts.length > 0) {
+    query.id = { $nin: excludeProducts };
   }
 
   if (filters.categories && filters.categories.length > 0) {
-    query.category = { $in: filters.categories };
+    const categoryConditions = filters.categories.map(cat => ({
+      category: { $regex: cat, $options: 'i' },
+    }));
+
+    andConditions.push({ $or: categoryConditions });
   }
 
-  if ((filters.minPrice !== undefined && filters.minPrice !== null) || (filters.maxPrice !== undefined && filters.maxPrice !== null)) {
+  if (filters.minPrice || filters.maxPrice) {
     query.currentPrice = {};
-    if (filters.minPrice !== undefined && filters.minPrice !== null) {
+    if (filters.minPrice) {
       query.currentPrice.$gte = filters.minPrice;
     }
-    if (filters.maxPrice !== undefined && filters.maxPrice !== null) {
+    if (filters.maxPrice) {
       query.currentPrice.$lte = filters.maxPrice;
-    }
-
-    if (Object.keys(query.currentPrice).length === 0) {
-      delete query.currentPrice;
     }
   }
 
@@ -99,6 +99,16 @@ export const searchProducts = async (db: Db, filters: Partial<QueryFilters> = {}
     }));
 
     andConditions.push(...keywordConditions);
+  }
+
+  if (filters.minCreatedAt || filters.maxCreatedAt) {
+    query.createdAt = {};
+    if (filters.minCreatedAt) {
+      query.createdAt.$gte = filters.minCreatedAt;
+    }
+    if (filters.maxCreatedAt) {
+      query.createdAt.$lte = filters.maxCreatedAt;
+    }
   }
 
   if (andConditions.length > 0) {

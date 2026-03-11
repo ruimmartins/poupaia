@@ -3,7 +3,8 @@ import path from 'path';
 import { existsSync } from 'fs';
 import { Listr } from 'listr2';
 import { scrapAmazon } from './amazon';
-import { connectToDatabase, closeConnection, Product, createOrUpdateProducts, deleteInvalidProducts } from '@poupaia/db';
+import { connectToDatabase, closeConnection, Product, createOrUpdateProducts, deleteInvalidProducts, getAllUsers, searchProducts } from '@poupaia/db';
+import { sendProductsToUser } from '@poupaia/shared';
 
 // Carregar .env da pasta apps/scraper (apenas em desenvolvimento local)
 const envPath = path.resolve(__dirname, '../.env');
@@ -76,6 +77,23 @@ const main = async () => {
       task: async (ctx, task) => {
         const result = await deleteInvalidProducts(ctx.db);
         task.title = `${result.deletedCount} produtos antigos apagados`;
+      },
+    },
+    {
+      title: 'A enviar novos produtos aos utilizadores',
+      task: async (ctx, task) => {
+        const users = await getAllUsers(ctx.db);
+
+        for (const user of users) {
+          if (user.queries && user.queries.length > 0) {
+            for (const query of user.queries) {
+              const products = await searchProducts(ctx.db, { query, minCreatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() }); // Produtos criado agora ou há 1h
+              if (products.length > 0) {
+                await sendProductsToUser(ctx.db, user.id, user.chatId, products);
+              }
+            }
+          }
+        }
       },
     },
   ]);

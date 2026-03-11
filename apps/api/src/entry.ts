@@ -15,7 +15,7 @@ export const handleRequest = async (message: any): Promise<void> => {
     const db = await connectToDatabase();
     console.log('[handleRequest] DB connected');
 
-    const user = await getOrCreateUser(db, userId);
+    const user = await getOrCreateUser(db, userId, chatId, { ...message.from });
     console.log(`[handleRequest] User state=${user.state} userId=${userId}`);
 
     await saveMessage(db, {
@@ -45,18 +45,20 @@ export const handleRequest = async (message: any): Promise<void> => {
         await handleInterestsWorkflow(db, chatId, user, unprocessedMessages);
         break;
       case UserStateEnum.IDLE:
-        await handleIdleWorkflow(db, chatId, userId, unprocessedMessages);
+        await handleIdleWorkflow(db, chatId, user, unprocessedMessages);
         break;
       case UserStateEnum.BROWSING:
         const lastActivity = await getLastActivity(db, userId);
         console.log(`[handleRequest] Last activity found=${!!lastActivity} productsSent=${lastActivity?.productsSent?.length ?? 0}`);
 
-        const lastActivityMessages = lastActivity?.messages.map(m => m.text) || [];
-        const isMessageRelatedToLastActivity = await processUserMessage<{ related: boolean }>(relatedMessagesPrompt(lastActivityMessages), unprocessedMessages.map(m => m.text).join(', '));
+        const isMessageRelatedToLastActivity = await processUserMessage<{ related: boolean }>(
+          relatedMessagesPrompt([lastActivity?.trigger || '']),
+          unprocessedMessages.map(m => ({ role: m.type === 'user' ? 'user' : 'model', content: m.text }))
+        );
         console.log(`[handleRequest] Message related to last activity=${isMessageRelatedToLastActivity.related}`);
 
         if (!isMessageRelatedToLastActivity.related) {
-          await handleIdleWorkflow(db, chatId, userId, unprocessedMessages);
+          await handleIdleWorkflow(db, chatId, user, unprocessedMessages);
         } else {
           await handleBrowsingWorkflow(db, chatId, user, lastActivity, unprocessedMessages);
         }

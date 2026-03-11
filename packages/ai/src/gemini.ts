@@ -1,19 +1,29 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
+import { Contents } from './types/gemini-types';
 
-export const processUserMessage = async <T>(systemInstruction: string, userMessage: string): Promise<T> => {
+export const processUserMessage = async <T>(systemInstruction: string, contents: Contents[]): Promise<T> => {
   try {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
-    const model = genAI.getGenerativeModel({
+    const contentParts = contents.map(c => ({ role: c.role, parts: [{ text: c.content }] }));
+
+    const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-lite',
-      systemInstruction,
+      contents: contentParts,
+      config: {
+        systemInstruction: {
+          parts: [{ text: systemInstruction }],
+        },
+        temperature: 0.2,
+        thinkingConfig: {
+          thinkingBudget: 0,
+        },
+      },
     });
 
-    const result = await model.generateContent(userMessage);
-    const response = result.response;
-    const text = response.text();
+    const text = response.text;
 
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const jsonMatch = (text ?? '').match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       throw new Error('Formato de resposta inválido do Gemini');
     }
