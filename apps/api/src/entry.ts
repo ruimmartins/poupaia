@@ -1,9 +1,8 @@
 import { handleIdleWorkflow } from './workflows/idle';
 import { handleBrowsingWorkflow } from './workflows/browsing';
 import { handleInterestsWorkflow } from './workflows/interests';
-import { closeConnection, connectToDatabase, getLastActivity, getOrCreateUser, getUnprocessedMessagesForUser, saveMessage } from '@poupaia/db';
+import { closeConnection, connectToDatabase, getLastActivity, getOrCreateUser, getUnprocessedMessagesForUser, saveMessage, UserStateEnum } from '@poupaia/db';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
-import { UserStateEnum } from 'packages/db/src/models/user';
 import { processUserMessage, relatedMessagesPrompt } from '@poupaia/ai';
 
 export const handleRequest = async (message: any): Promise<void> => {
