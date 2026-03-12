@@ -1,4 +1,4 @@
-import { idlePrompt, IdleIntentTypeEnum, processUserMessage, SearchResponse } from '@poupaia/ai';
+import { idlePrompt, IdleIntentTypeEnum, processUserMessage, SearchResponse, generateEmbedding } from '@poupaia/ai';
 import { Message, searchProducts, getAllCategories, createOrUpdateActivity, setMessegesAsProcessed, User, updateUserState } from '@poupaia/db';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
 import { sendProductsToUser } from '@poupaia/shared';
@@ -17,7 +17,13 @@ export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, mes
     idlePrompt(filteredCategories),
     messages.map(m => ({ role: m.type === 'user' ? 'user' : 'model', content: m.text }))
   );
-  console.log(`[idleWorkflow] AI result type=${type} intent=${JSON.stringify(intent)}`);
+
+  const embeddings = await generateEmbedding([`${intent.query}, Category: ${intent.categories.join(', ')}`]);
+  intent.embeddings = embeddings[0].values ?? [];
+
+  console.log(`[idleWorkflow] Embeddings generated for query="${intent.query}" categories="${intent.categories.join(', ')}" with length=${intent.embeddings.length}`);
+
+  console.log(`[idleWorkflow] AI result type=${type} intent=${JSON.stringify({ ...intent, embeddings: '...hidden...' })}`);
 
   await setMessegesAsProcessed(
     db,
@@ -26,9 +32,8 @@ export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, mes
 
   switch (type) {
     case IdleIntentTypeEnum.SEARCH:
-    case IdleIntentTypeEnum.GIFT:
-      console.log(`[idleWorkflow] ${type} — searching products with intent=${JSON.stringify(intent)}`);
-      await updateUserState(db, user.id, { queries: [...(user.queries || []), intent.query] });
+      /* console.log(`[idleWorkflow] ${type} — searching products with intent=${JSON.stringify(intent)}`); */
+      await updateUserState(db, user.id, { queries: [...(user.queries || []), { query: intent.query, embeddings: intent.embeddings }] });
       const products = await searchProducts(db, intent);
       console.log(`[idleWorkflow] Products found=${products.length}`);
 

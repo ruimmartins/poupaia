@@ -11,11 +11,16 @@ export enum UserStateEnum {
   SETTING_INTERESTS = 'setting_interests',
 }
 
+export interface UserQueries {
+  query: string;
+  embeddings?: number[];
+}
+
 export interface User {
   id: number;
   createdAt: string;
   state: UserStateEnum;
   profile: Profile;
-  queries?: string[];
+  queries?: UserQueries[];
   chatId: number;
 }

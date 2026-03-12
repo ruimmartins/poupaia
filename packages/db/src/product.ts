@@ -58,25 +58,36 @@ export const deleteInvalidProducts = async (db: Db) => {
   });
 };
 
-export const searchProducts = async (db: Db, filters: Partial<QueryFilters> = {}, excludeProducts?: string[]): Promise<Product[]> => {
+export const getAllProductsWithoutEmbeddings = async (db: Db): Promise<Product[]> => {
   const collection = await getProductsCollection(db);
 
-  const query: any = {
-    $text: { $search: filters.query },
-  };
+  return await collection
+    .find({
+      $or: [{ embedding: { $exists: false } }, { embedding: { $size: 0 } }],
+    })
+    .toArray();
+};
 
-  const andConditions: any[] = [];
+export const searchProducts = async (db: Db, filters: Partial<QueryFilters> = {}, excludeProducts?: string[]): Promise<Product[]> => {
+  const collection = await getProductsCollection(db);
+  const vectorIndexName = process.env.MONGODB_VECTOR_INDEX_NAME || 'product_vector_search';
+
+  if (!Array.isArray(filters.embeddings) || filters.embeddings.length === 0) {
+    console.warn('[searchProducts] Missing embeddings for vector search');
+    return [];
+  }
+
+  const expectedDimensionsRaw = process.env.MONGODB_VECTOR_DIMENSIONS || '';
+  const expectedDimensions = Number.parseInt(expectedDimensionsRaw, 10);
+  if (Number.isFinite(expectedDimensions) && filters.embeddings.length !== expectedDimensions) {
+    console.warn(`[searchProducts] Embedding dimensions mismatch. expected=${expectedDimensions} got=${filters.embeddings.length}`);
+    return [];
+  }
+
+  const query: any = {};
 
   if (excludeProducts && excludeProducts.length > 0) {
     query.id = { $nin: excludeProducts };
-  }
-
-  if (filters.categories && filters.categories.length > 0) {
-    const categoryConditions = filters.categories.map(cat => ({
-      category: { $regex: cat, $options: 'i' },
-    }));
-
-    andConditions.push({ $or: categoryConditions });
   }
 
   if (filters.minPrice || filters.maxPrice) {
@@ -93,14 +104,6 @@ export const searchProducts = async (db: Db, filters: Partial<QueryFilters> = {}
     query.discountPercentage = { $gte: filters.minDiscount };
   }
 
-  if (filters.keywordGroups && filters.keywordGroups.length > 0) {
-    const keywordConditions = filters.keywordGroups.map(group => ({
-      $or: group.map(keyword => ({ title: { $regex: `\\b${keyword}\\b`, $options: 'i' } })),
-    }));
-
-    andConditions.push(...keywordConditions);
-  }
-
   if (filters.minCreatedAt || filters.maxCreatedAt) {
     query.createdAt = {};
     if (filters.minCreatedAt) {
@@ -111,13 +114,26 @@ export const searchProducts = async (db: Db, filters: Partial<QueryFilters> = {}
     }
   }
 
-  if (andConditions.length > 0) {
-    query.$and = andConditions;
-  }
+  const hasFilterQuery = Object.keys(query).length > 0;
 
   const results = await collection
-    .find(query)
-    .sort({ score: { $meta: 'textScore' } })
+    .aggregate<Product>([
+      {
+        $vectorSearch: {
+          index: vectorIndexName,
+          path: 'embedding',
+          queryVector: filters.embeddings,
+          ...(hasFilterQuery ? { filter: query } : {}),
+          numCandidates: 1000,
+          limit: 10,
+        },
+      },
+      {
+        $addFields: {
+          score: { $meta: 'vectorSearchScore' },
+        },
+      },
+    ])
     .toArray();
 
   return results;

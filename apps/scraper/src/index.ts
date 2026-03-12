@@ -3,8 +3,9 @@ import path from 'path';
 import { existsSync } from 'fs';
 import { Listr } from 'listr2';
 import { scrapAmazon } from './amazon';
-import { connectToDatabase, closeConnection, Product, createOrUpdateProducts, deleteInvalidProducts, getAllUsers, searchProducts } from '@poupaia/db';
+import { connectToDatabase, closeConnection, Product, createOrUpdateProducts, deleteInvalidProducts, getAllUsers, searchProducts, getProductsCollection, getAllProductsWithoutEmbeddings } from '@poupaia/db';
 import { sendProductsToUser } from '@poupaia/shared';
+import { generateEmbedding } from '@poupaia/ai';
 
 // Carregar .env da pasta apps/scraper (apenas em desenvolvimento local)
 const envPath = path.resolve(__dirname, '../.env');
@@ -80,16 +81,52 @@ const main = async () => {
       },
     },
     {
+      title: 'A gerar embeddings para os produtos',
+      task: async (ctx, task) => {
+        const batchSize = 50;
+        const products: Product[] = await getAllProductsWithoutEmbeddings(ctx.db);
+
+        for (let i = 0; i < products.length; i += batchSize) {
+          const batch = products.slice(i, i + batchSize);
+
+          const texts = batch.map(
+            p => `
+                  ${p.title}
+                  Brand: ${p.brand}
+                  Category: ${p.category}
+                `
+          );
+
+          const response = await generateEmbedding(texts);
+
+          for (let j = 0; j < batch.length; j++) {
+            batch[j].embedding = response[j].values;
+          }
+
+          await createOrUpdateProducts(ctx.db, batch);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Pequena pausa para evitar sobrecarregar a API
+        }
+
+        task.title = `Embeddings gerados para ${products.length} produtos`;
+      },
+    },
+    {
       title: 'A enviar novos produtos aos utilizadores',
+      skip: true, // Desativado por enquanto para evitar envios acidentais durante testes
       task: async (ctx, task) => {
         const users = await getAllUsers(ctx.db);
 
         for (const user of users) {
           if (user.queries && user.queries.length > 0) {
             for (const query of user.queries) {
-              const products = await searchProducts(ctx.db, { query, minCreatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString() }); // Produtos criado agora ou há 1h
-              if (products.length > 0) {
-                await sendProductsToUser(ctx.db, user.id, user.chatId, products);
+              // Gerar embedding para a query string
+              const foundProducts: Product[] = await searchProducts(ctx.db, {
+                embeddings: query.embeddings,
+                minCreatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+              });
+
+              if (foundProducts.length > 0) {
+                await sendProductsToUser(ctx.db, user.id, user.chatId, foundProducts);
               }
             }
           }

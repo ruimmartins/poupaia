@@ -3,7 +3,7 @@
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { existsSync } from 'fs';
-import { connectToDatabase, closeConnection, getProductsCollection, getAlertsCollection, getMessagesCollection, getUsersCollection } from '../index';
+import { connectToDatabase, closeConnection, getProductsCollection, getMessagesCollection, getUsersCollection } from '../index';
 
 // Carregar .env (procura na raiz do projeto)
 const envPath = path.resolve(__dirname, '../../../../.env');
@@ -22,6 +22,26 @@ const createIndexes = async () => {
 
     console.log('📊 Creating indexes...\n');
 
+    const dropIndexIfExists = async (collectionName: string, indexName: string): Promise<void> => {
+      try {
+        await db.collection(collectionName).dropIndex(indexName);
+        console.log(`✓ Dropped obsolete index ${collectionName}.${indexName}`);
+      } catch (error: any) {
+        if (error.code === 27 || error.message?.includes('index not found')) {
+          console.log(`✓ Obsolete index ${collectionName}.${indexName} not present`);
+          return;
+        }
+
+        // NamespaceNotFound means collection does not exist yet.
+        if (error.code === 26 || error.message?.includes('ns not found')) {
+          console.log(`✓ Collection ${collectionName} not found, skip dropping ${indexName}`);
+          return;
+        }
+
+        console.log(`⚠️  Could not drop obsolete index ${collectionName}.${indexName}:`, error.message);
+      }
+    };
+
     // 0. Remover index antigo se existir (tinha category no text search)
     console.log('Checking for old text search index...');
     try {
@@ -35,16 +55,27 @@ const createIndexes = async () => {
       }
     }
 
+    // Limpeza de índices obsoletos
+    await dropIndexIfExists('products', 'idx_status');
+    await dropIndexIfExists('messages', 'idx_userId_createdAt');
+    await dropIndexIfExists('messages', 'idx_intentType');
+    await dropIndexIfExists('users', 'idx_blockedUntil');
+    await dropIndexIfExists('users', 'idx_isActive');
+    await dropIndexIfExists('alerts', 'idx_userId');
+    await dropIndexIfExists('alerts', 'idx_isActive');
+    await dropIndexIfExists('alerts', 'idx_userId_isActive');
+    await dropIndexIfExists('alerts', 'idx_lastCheckedAt');
+
     // 1. Text index para pesquisa orgânica (APENAS no título)
     console.log('Creating text search index...');
     try {
       await collection.createIndex(
-        { 
-          title: 'text'
+        {
+          title: 'text',
         },
         {
           name: 'product_text_search',
-          collation: { locale: 'simple' }  // Override collection collation para text index
+          collation: { locale: 'simple' }, // Override collection collation para text index
         }
       );
       console.log('✓ Text search index created');
@@ -82,29 +113,104 @@ const createIndexes = async () => {
     await collection.createIndex({ expiresAt: 1 }, { name: 'idx_expiresAt' });
     console.log('✓ ExpiresAt index created');
 
-    // 7. Index para status
-    console.log('Creating status index...');
-    await collection.createIndex({ status: 1 }, { name: 'idx_status' });
-    console.log('✓ Status index created');
-
-    // 8. Compound index para queries comuns (categoria + desconto)
+    // 7. Compound index para queries comuns (categoria + desconto)
     console.log('Creating compound index (category + discount)...');
-    await collection.createIndex(
-      { category: 1, discountPercentage: -1 },
-      { name: 'idx_category_discount' }
-    );
+    await collection.createIndex({ category: 1, discountPercentage: -1 }, { name: 'idx_category_discount' });
     console.log('✓ Compound index created');
 
-    // 9. Compound index para produtos não expirados
+    // 8. Compound index para produtos não expirados
     console.log('Creating compound index (expiresAt + createdAt)...');
-    await collection.createIndex(
-      { expiresAt: 1, createdAt: -1 },
-      { name: 'idx_expiresAt_createdAt' }
-    );
+    await collection.createIndex({ expiresAt: 1, createdAt: -1 }, { name: 'idx_expiresAt_createdAt' });
     console.log('✓ Compound index created');
+
+    // 9. Vector Search index (MongoDB Atlas Search)
+    console.log('Creating vector search index...');
+    const vectorDimensionsRaw = process.env.MONGODB_VECTOR_DIMENSIONS;
+    const vectorIndexName = process.env.MONGODB_VECTOR_INDEX_NAME || 'product_vector_search';
+    const vectorFieldPath = process.env.MONGODB_VECTOR_FIELD_PATH || 'embedding';
+    const vectorSimilarity = process.env.MONGODB_VECTOR_SIMILARITY || 'cosine';
+
+    if (!vectorDimensionsRaw) {
+      console.log('⚠️  Skipping vector index: set MONGODB_VECTOR_DIMENSIONS to enable vectorSearch index creation');
+    } else {
+      const vectorDimensions = Number.parseInt(vectorDimensionsRaw, 10);
+
+      if (!Number.isFinite(vectorDimensions) || vectorDimensions <= 0) {
+        console.log(`⚠️  Invalid MONGODB_VECTOR_DIMENSIONS: "${vectorDimensionsRaw}". Skipping vector index.`);
+      } else {
+        const hasSearchIndexCommands = async (): Promise<boolean> => {
+          try {
+            const adminDb = db.admin();
+            const commandsResponse = await adminDb.command({ listCommands: 1 });
+            const commands = commandsResponse?.commands || {};
+            return Boolean(commands.createSearchIndexes && commands.updateSearchIndex && commands.listSearchIndexes);
+          } catch {
+            return false;
+          }
+        };
+
+        const searchCommandsSupported = await hasSearchIndexCommands();
+        if (!searchCommandsSupported) {
+          console.log('⚠️  Skipping vector index: this MongoDB deployment does not support Atlas Search commands.');
+          console.log('  Use MongoDB Atlas (with Search enabled) to create and run vectorSearch indexes.');
+          console.log('  Continuing with other indexes...');
+        } else {
+          const vectorDefinition = {
+            fields: [
+              {
+                type: 'vector',
+                path: vectorFieldPath,
+                numDimensions: vectorDimensions,
+                similarity: vectorSimilarity,
+              },
+            ],
+          };
+
+          try {
+            const existingVectorIndexes = await db.command({
+              listSearchIndexes: 'products',
+              name: vectorIndexName,
+            });
+
+            const hasVectorIndex = Array.isArray(existingVectorIndexes?.indexes) && existingVectorIndexes.indexes.length > 0;
+
+            if (hasVectorIndex) {
+              await db.command({
+                updateSearchIndex: 'products',
+                name: vectorIndexName,
+                definition: vectorDefinition,
+              });
+              console.log('✓ Vector search index updated');
+            } else {
+              await db.command({
+                createSearchIndexes: 'products',
+                indexes: [
+                  {
+                    name: vectorIndexName,
+                    type: 'vectorSearch',
+                    definition: vectorDefinition,
+                  },
+                ],
+              });
+              console.log('✓ Vector search index created');
+            }
+          } catch (error: any) {
+            if (error.message?.includes('already exists') || error.message?.includes('Index already exists')) {
+              console.log('✓ Vector search index already exists');
+            } else if (error.code === 59 || error.message?.toLowerCase().includes('command not found')) {
+              console.log('⚠️  Skipping vector index: server does not support Atlas Search commands.');
+              console.log('  Use MongoDB Atlas Search for vector indexes.');
+            } else {
+              console.error('⚠️  Could not create/update vector search index:', error.message);
+              console.log('  Continuing with other indexes...');
+            }
+          }
+        }
+      }
+    }
 
     console.log('\n✅ All product indexes created successfully!');
-    
+
     // Mostrar todos os indexes criados
     const indexes = await collection.indexes();
     console.log('\n📋 Current product indexes:');
@@ -112,60 +218,22 @@ const createIndexes = async () => {
       console.log(`   - ${idx.name}`);
     });
 
-    // ========= ALERTS INDEXES =========
-    console.log('\n📊 Creating alerts indexes...\n');
-    const alertsCollection = await getAlertsCollection(db);
-
-    // 1. Index para userId (queries mais comuns)
-    console.log('Creating userId index...');
-    await alertsCollection.createIndex({ userId: 1 }, { name: 'idx_userId' });
-    console.log('✓ UserId index created');
-
-    // 2. Index para isActive
-    console.log('Creating isActive index...');
-    await alertsCollection.createIndex({ isActive: 1 }, { name: 'idx_isActive' });
-    console.log('✓ IsActive index created');
-
-    // 3. Compound index para queries de alertas ativos de um user
-    console.log('Creating compound index (userId + isActive)...');
-    await alertsCollection.createIndex(
-      { userId: 1, isActive: 1 },
-      { name: 'idx_userId_isActive' }
-    );
-    console.log('✓ Compound index created');
-
-    // 4. Index para lastCheckedAt (para encontrar alertas que precisam ser verificados)
-    console.log('Creating lastCheckedAt index...');
-    await alertsCollection.createIndex({ lastCheckedAt: 1 }, { name: 'idx_lastCheckedAt' });
-    console.log('✓ LastCheckedAt index created');
-
-    console.log('\n✅ All alert indexes created successfully!');
-    
-    const alertIndexes = await alertsCollection.indexes();
-    console.log('\n📋 Current alert indexes:');
-    alertIndexes.forEach(idx => {
-      console.log(`   - ${idx.name}`);
-    });
-
     // ========= MESSAGES INDEXES =========
     console.log('\n📊 Creating messages indexes...\n');
     const messagesCollection = await getMessagesCollection(db);
 
-    // 1. Compound index para histórico de mensagens de um user (mais comum)
-    console.log('Creating compound index (userId + createdAt)...');
-    await messagesCollection.createIndex(
-      { userId: 1, createdAt: -1 },
-      { name: 'idx_userId_createdAt' }
-    );
+    // 1. Compound index para buscar mensagens por user e estado de processamento
+    console.log('Creating compound index (userId + processed)...');
+    await messagesCollection.createIndex({ userId: 1, processed: 1 }, { name: 'idx_userId_processed' });
     console.log('✓ Compound index created');
 
-    // 2. Index para intentType (para analytics)
-    console.log('Creating intentType index...');
-    await messagesCollection.createIndex({ intentType: 1 }, { name: 'idx_intentType' });
-    console.log('✓ IntentType index created');
+    // 2. Index único para id de mensagem
+    console.log('Creating id unique index...');
+    await messagesCollection.createIndex({ id: 1 }, { name: 'idx_id', unique: true });
+    console.log('✓ Id unique index created');
 
     console.log('\n✅ All message indexes created successfully!');
-    
+
     const messageIndexes = await messagesCollection.indexes();
     console.log('\n📋 Current message indexes:');
     messageIndexes.forEach(idx => {
@@ -181,18 +249,8 @@ const createIndexes = async () => {
     await usersCollection.createIndex({ id: 1 }, { name: 'idx_id', unique: true });
     console.log('✓ Id unique index created');
 
-    // 2. Index para blockedUntil (para queries de bloqueio)
-    console.log('Creating blockedUntil index...');
-    await usersCollection.createIndex({ blockedUntil: 1 }, { name: 'idx_blockedUntil' });
-    console.log('✓ BlockedUntil index created');
-
-    // 3. Index para isActive
-    console.log('Creating isActive index...');
-    await usersCollection.createIndex({ isActive: 1 }, { name: 'idx_isActive' });
-    console.log('✓ IsActive index created');
-
     console.log('\n✅ All user indexes created successfully!');
-    
+
     const userIndexes = await usersCollection.indexes();
     console.log('\n📋 Current user indexes:');
     userIndexes.forEach(idx => {
@@ -200,7 +258,6 @@ const createIndexes = async () => {
     });
 
     console.log('\n🎉 ALL DATABASE INDEXES CREATED SUCCESSFULLY!');
-    
   } catch (error) {
     console.error('❌ Error creating indexes:', error);
     throw error;

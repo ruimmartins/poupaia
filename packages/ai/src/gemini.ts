@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { ContentEmbedding, GoogleGenAI } from '@google/genai';
 import { Contents } from './types/gemini-types';
 
 export const processUserMessage = async <T>(systemInstruction: string, contents: Contents[]): Promise<T> => {
@@ -35,5 +35,21 @@ export const processUserMessage = async <T>(systemInstruction: string, contents:
     console.error('Erro ao processar mensagem com Gemini:', error);
 
     return { error: true, message: (error as Error).message } as T;
+  }
+};
+
+export const generateEmbedding = async (contents: string[]): Promise<ContentEmbedding[]> => {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+
+    const response = await ai.models.embedContent({
+      model: 'gemini-embedding-001',
+      contents,
+    });
+
+    return response.embeddings || [];
+  } catch (error) {
+    console.error('Erro ao gerar embedding com Gemini:', error);
+    return [];
   }
 };
