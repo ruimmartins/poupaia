@@ -18,13 +18,6 @@ export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, mes
     messages.map(m => ({ role: m.type === 'user' ? 'user' : 'model', content: m.text }))
   );
 
-  const embeddings = await generateEmbedding([`${intent.query}, Category: ${intent.categories.join(', ')}`]);
-  intent.embeddings = embeddings[0].values ?? [];
-
-  console.log(`[idleWorkflow] Embeddings generated for query="${intent.query}" categories="${intent.categories.join(', ')}" with length=${intent.embeddings.length}`);
-
-  console.log(`[idleWorkflow] AI result type=${type} intent=${JSON.stringify({ ...intent, embeddings: '...hidden...' })}`);
-
   await setMessegesAsProcessed(
     db,
     messages.map(m => m.id)
@@ -32,8 +25,14 @@ export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, mes
 
   switch (type) {
     case IdleIntentTypeEnum.SEARCH:
+      const embeddings = await generateEmbedding([`${intent.query[0]}, Category: ${intent.categories.join(', ')}`]);
+      intent.embeddings = embeddings[0].values ?? [];
+
+      console.log(`[idleWorkflow] Embeddings generated for query="${intent.query[0]}" categories="${intent.categories.join(', ')}" with length=${intent.embeddings.length}`);
+
+      console.log(`[idleWorkflow] AI result type=${type} intent=${JSON.stringify({ ...intent, embeddings: '...hidden...' })}`);
       /* console.log(`[idleWorkflow] ${type} — searching products with intent=${JSON.stringify(intent)}`); */
-      await updateUserState(db, user.id, { queries: [...(user.queries || []), { query: intent.query, embeddings: intent.embeddings }] });
+      await updateUserState(db, user.id, { queries: [...(user.queries || []), { query: intent.query[0], embeddings: intent.embeddings }] });
       const products = await searchProducts(db, intent);
       console.log(`[idleWorkflow] Products found=${products.length}`);
 

@@ -1,6 +1,6 @@
 export interface QueryFilters {
   // Pesquisa orgânica
-  query: string; // Query de pesquisa orgânica (usado com text search)
+  query: string[]; // Query de pesquisa orgânica (usado com text search)
 
   // Filtros de preço
   minPrice?: number;
