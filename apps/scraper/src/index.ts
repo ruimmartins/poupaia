@@ -89,15 +89,9 @@ const main = async () => {
         for (let i = 0; i < products.length; i += batchSize) {
           const batch = products.slice(i, i + batchSize);
 
-          const texts = batch.map(
-            p => `
-                  ${p.title}
-                  Brand: ${p.brand}
-                  Category: ${p.category}
-                `
-          );
+          const contents = batch.map(p => `${p.title}, Category: ${p.category}`);
 
-          const response = await generateEmbedding(texts);
+          const response = await generateEmbedding(contents);
 
           for (let j = 0; j < batch.length; j++) {
             batch[j].embedding = response[j].values;
@@ -112,7 +106,6 @@ const main = async () => {
     },
     {
       title: 'A enviar novos produtos aos utilizadores',
-      skip: true, // Desativado por enquanto para evitar envios acidentais durante testes
       task: async (ctx, task) => {
         const users = await getAllUsers(ctx.db);
 

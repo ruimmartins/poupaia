@@ -7,8 +7,6 @@ export interface Product {
   currentPrice: number; // Cleaned decimal (e.g., 29.99)
   originalPrice: number | null; // For discount calculation
   brand: string | null; // Optional brand name
-  brandLevel: number;
-  currency: string; // "EUR"
   discountPercentage: number; // Calculated: ((original - current) / original) * 100
 
   // --- Assets & Links ---

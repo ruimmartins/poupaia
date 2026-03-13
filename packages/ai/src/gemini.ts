@@ -1,5 +1,8 @@
 import { ContentEmbedding, GoogleGenAI } from '@google/genai';
 import { Contents } from './types/gemini-types';
+import { Product } from '@poupaia/db';
+
+const EMBEDDING_DIMENSION = 768;
 
 export const processUserMessage = async <T>(systemInstruction: string, contents: Contents[]): Promise<T> => {
   try {
@@ -43,8 +46,11 @@ export const generateEmbedding = async (contents: string[]): Promise<ContentEmbe
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
     const response = await ai.models.embedContent({
-      model: 'gemini-embedding-001',
+      model: 'gemini-embedding-002',
       contents,
+      config: {
+        outputDimensionality: EMBEDDING_DIMENSION,
+      },
     });
 
     return response.embeddings || [];
