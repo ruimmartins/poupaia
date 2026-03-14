@@ -3,10 +3,14 @@ import { Product, saveMessage, updateUserState, UserStateEnum } from '@poupaia/d
 import { sendTelegramMessage, sendTelegramPhoto, formatProductsForUser, getRandomMessage, MESSAGES, escapeMarkdownV2, QUESTIONS } from '@poupaia/messaging';
 import { TelegramAction } from 'packages/messaging/src/types/telegram-action';
 
-export const sendProductsToUser = async (db: Db, userId: number, chatId: number, products: Product[]) => {
-  const sentProducts: Product[] = products.slice(0, 10); // Limitar a 10 produtos para evitar sobrecarregar o usuário
+const PRODUCTS_PER_PAGE = 10;
 
-  const productMessages = formatProductsForUser(products);
+export const sendProductsToUser = async (db: Db, userId: number, chatId: number, products: Product[]) => {
+  const sentProducts: Product[] = products.slice(0, PRODUCTS_PER_PAGE); // Limitar a 10 produtos para evitar sobrecarregar o usuário
+
+  await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.PRODUCTS_FOUND(sentProducts.length))));
+
+  const productMessages = formatProductsForUser(sentProducts);
   for (const message of productMessages) {
     if (message.imageUrl) {
       await sendTelegramPhoto(chatId, message.imageUrl, message.text);
@@ -21,7 +25,7 @@ export const sendProductsToUser = async (db: Db, userId: number, chatId: number,
   let systemFollowUpMessage = getRandomMessage(MESSAGES.NO_MORE_PRODUCTS);
   let systemFollowUpActions: TelegramAction[] = [{ text: 'nova pesquisa', callback_data: 'new_search' }];
 
-  if (products.length < 5) {
+  if (products.length > PRODUCTS_PER_PAGE) {
     systemFollowUpMessage = getRandomMessage(QUESTIONS.MORE_PRODUCTS_AVAILABLE);
     systemFollowUpActions.push({ text: 'ver mais', callback_data: 'more_products' });
   }

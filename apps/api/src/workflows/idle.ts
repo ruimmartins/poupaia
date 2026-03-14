@@ -37,8 +37,6 @@ export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, mes
       console.log(`[idleWorkflow] Products found=${products.length}`);
 
       if (products.length > 0) {
-        await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.PRODUCTS_FOUND(products.length))));
-
         const sentProducts = await sendProductsToUser(db, user.id, chatId, products);
 
         await createOrUpdateActivity(db, {

@@ -125,7 +125,7 @@ export const searchProducts = async (db: Db, filters: Partial<QueryFilters> = {}
           queryVector: filters.embeddings,
           ...(hasFilterQuery ? { filter: query } : {}),
           numCandidates: 1000,
-          limit: 10,
+          limit: 20,
         },
       },
       {

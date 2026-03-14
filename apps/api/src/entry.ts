@@ -1,7 +1,7 @@
 import { handleIdleWorkflow } from './workflows/idle';
 import { handleBrowsingWorkflow } from './workflows/browsing';
 import { handleInterestsWorkflow } from './workflows/interests';
-import { closeConnection, connectToDatabase, createOrUpdateActivity, getLastActivity, getOrCreateUser, getUnprocessedMessagesForUser, saveMessage, searchProducts, UserStateEnum } from '@poupaia/db';
+import { closeConnection, connectToDatabase, createOrUpdateActivity, getLastActivity, getOrCreateUser, getUnprocessedMessagesForUser, saveMessage, searchProducts, updateUserState, UserStateEnum } from '@poupaia/db';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
 import { processUserMessage, relatedMessagesPrompt } from '@poupaia/ai';
 import { sendProductsToUser } from 'packages/shared/src/send-products-telegram';
@@ -31,33 +31,31 @@ export const handleRequest = async (message: any): Promise<void> => {
 
     await new Promise(resolve => setTimeout(resolve, 5000));
 
-    const unprocessedMessages = await getUnprocessedMessagesForUser(db, userId);
-    console.log(`[handleRequest] Unprocessed messages count=${unprocessedMessages.length}`);
-
-    const lastMessage = unprocessedMessages.at(-1);
-    if (lastMessage?.timestamp && new Date().getTime() - new Date(lastMessage.timestamp).getTime() < 5000) {
-      console.log('[handleRequest] Newer message detected — skipping this one');
-      return;
-    }
-
     console.log(`[handleRequest] Routing to workflow for state=${user.state}`);
     switch (user.state) {
-      case UserStateEnum.SETTING_INTERESTS:
+      /* case UserStateEnum.SETTING_INTERESTS:
         await handleInterestsWorkflow(db, chatId, user, unprocessedMessages);
-        break;
+        break; */
       case UserStateEnum.IDLE:
+        const unprocessedMessages = await getUnprocessedMessagesForUser(db, userId);
+        console.log(`[handleRequest] Unprocessed messages count=${unprocessedMessages.length}`);
+
+        const lastMessage = unprocessedMessages.at(-1);
+        if (lastMessage?.timestamp && new Date().getTime() - new Date(lastMessage.timestamp).getTime() < 5000) {
+          console.log('[handleRequest] Newer message detected — skipping this one');
+          return;
+        }
+
         await handleIdleWorkflow(db, chatId, user, unprocessedMessages);
         break;
       case UserStateEnum.BROWSING:
         if (message.text.toLowerCase().includes(UserActionEnum.VIEW_MORE)) {
           const lastActivity = await getLastActivity(db, userId);
           if (lastActivity) {
-            const products = await searchProducts(db, lastActivity.intent);
+            const products = await searchProducts(db, lastActivity.intent, lastActivity.productsSent.map(p => p.id) || []);
             console.log(`[idleWorkflow] Products found=${products.length}`);
 
             if (products.length > 0) {
-              await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.PRODUCTS_FOUND(products.length))));
-
               const sentProducts = await sendProductsToUser(db, user.id, chatId, products);
 
               lastActivity.productsSent = [...(lastActivity.productsSent || []), ...sentProducts];
@@ -70,23 +68,18 @@ export const handleRequest = async (message: any): Promise<void> => {
             }
           }
         } else if (message.text.toLowerCase().includes(UserActionEnum.MORE_INFO)) {
+          await sendTelegramMessage(chatId, escapeMarkdownV2('Função ainda não implementada, mas já já você poderá clicar aqui para receber mais detalhes dos produtos que enviamos!'));
+          await updateUserState(db, userId, { state: UserStateEnum.IDLE });
         } else if (message.text.toLowerCase().includes(UserActionEnum.NEW_SEARCH)) {
-        }
-
-        /* const lastActivity = await getLastActivity(db, userId);
-        console.log(`[handleRequest] Last activity found=${!!lastActivity} productsSent=${lastActivity?.productsSent?.length ?? 0}`);
-
-        const isMessageRelatedToLastActivity = await processUserMessage<{ related: boolean }>(
-          relatedMessagesPrompt([lastActivity?.trigger || '']),
-          unprocessedMessages.map(m => ({ role: m.type === 'user' ? 'user' : 'model', content: m.text }))
-        );
-        console.log(`[handleRequest] Message related to last activity=${isMessageRelatedToLastActivity.related}`);
-
-        if (!isMessageRelatedToLastActivity.related) {
-          await handleIdleWorkflow(db, chatId, user, message.text);
+          await sendTelegramMessage(chatId, escapeMarkdownV2('Claro! O que você gostaria de encontrar?'));
+          await updateUserState(db, userId, { state: UserStateEnum.IDLE });
         } else {
-          await handleBrowsingWorkflow(db, chatId, user, lastActivity, unprocessedMessages);
-        } */
+          await sendTelegramMessage(chatId, escapeMarkdownV2('Não percebi direito, mas estou aqui para ajudar! Você pode me dizer o que gostaria de encontrar ou clicar em "Ver mais" para receber mais produtos relacionados à sua última busca.'), [
+            { text: 'Ver mais', callback_data: UserActionEnum.VIEW_MORE },
+            { text: 'Mais info', callback_data: UserActionEnum.MORE_INFO },
+            { text: 'Nova Pesquisa', callback_data: UserActionEnum.NEW_SEARCH },
+          ]);
+        }
         break;
       default:
         console.warn(`[handleRequest] Unknown state=${user.state} — sending fallback message`);
