@@ -1,22 +1,34 @@
 import { Product } from '@poupaia/db';
 import { BrowsingResponse } from '@poupaia/ai';
 import { TelegramMessage } from './types/telegram-message';
+import { TelegramAction } from './types/telegram-action';
+import { TelegramOptions } from './types/telegram-options';
 
 // Função de escape robusta para MarkdownV2
 export const escapeMarkdownV2 = (text: string | number): string => {
   return text.toString().replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
 };
 
-export const sendTelegramMessage = async (chat_id: string | number, text: string) => {
+export const sendTelegramMessage = async (chat_id: string | number, text: string, actions?: TelegramAction[]) => {
   try {
+    const body: any = {
+      chat_id,
+      text: text, // O texto já vem formatado e escapado do formatProductsForUser
+      parse_mode: 'MarkdownV2',
+    };
+
+    if (actions && actions.length > 0) {
+      body['reply_markup'] = {
+        inline_keyboard: [actions],
+      };
+    }
+
+    console.log(`[sendTelegramMessage] Sending message to chat_id=${chat_id} with body=${JSON.stringify(body)}`);
+
     const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id,
-        text: text, // O texto já vem formatado e escapado do formatProductsForUser
-        parse_mode: 'MarkdownV2',
-      }),
+      body: JSON.stringify(body),
     });
     const data = await response.json();
     await new Promise(resolve => setTimeout(resolve, 1000));

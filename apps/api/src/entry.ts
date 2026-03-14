@@ -1,9 +1,11 @@
 import { handleIdleWorkflow } from './workflows/idle';
 import { handleBrowsingWorkflow } from './workflows/browsing';
 import { handleInterestsWorkflow } from './workflows/interests';
-import { closeConnection, connectToDatabase, getLastActivity, getOrCreateUser, getUnprocessedMessagesForUser, saveMessage, UserStateEnum } from '@poupaia/db';
+import { closeConnection, connectToDatabase, createOrUpdateActivity, getLastActivity, getOrCreateUser, getUnprocessedMessagesForUser, saveMessage, searchProducts, UserStateEnum } from '@poupaia/db';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
 import { processUserMessage, relatedMessagesPrompt } from '@poupaia/ai';
+import { sendProductsToUser } from 'packages/shared/src/send-products-telegram';
+import { UserActionEnum } from './types/user-actions';
 
 export const handleRequest = async (message: any): Promise<void> => {
   const userId = message.from?.id;
@@ -47,7 +49,31 @@ export const handleRequest = async (message: any): Promise<void> => {
         await handleIdleWorkflow(db, chatId, user, unprocessedMessages);
         break;
       case UserStateEnum.BROWSING:
-        const lastActivity = await getLastActivity(db, userId);
+        if (message.text.toLowerCase().includes(UserActionEnum.VIEW_MORE)) {
+          const lastActivity = await getLastActivity(db, userId);
+          if (lastActivity) {
+            const products = await searchProducts(db, lastActivity.intent);
+            console.log(`[idleWorkflow] Products found=${products.length}`);
+
+            if (products.length > 0) {
+              await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.PRODUCTS_FOUND(products.length))));
+
+              const sentProducts = await sendProductsToUser(db, user.id, chatId, products);
+
+              lastActivity.productsSent = [...(lastActivity.productsSent || []), ...sentProducts];
+
+              await createOrUpdateActivity(db, lastActivity);
+
+              console.log('[idleWorkflow] Activity saved');
+            } else {
+              console.log('[idleWorkflow] No products found — no message sent');
+            }
+          }
+        } else if (message.text.toLowerCase().includes(UserActionEnum.MORE_INFO)) {
+        } else if (message.text.toLowerCase().includes(UserActionEnum.NEW_SEARCH)) {
+        }
+
+        /* const lastActivity = await getLastActivity(db, userId);
         console.log(`[handleRequest] Last activity found=${!!lastActivity} productsSent=${lastActivity?.productsSent?.length ?? 0}`);
 
         const isMessageRelatedToLastActivity = await processUserMessage<{ related: boolean }>(
@@ -57,10 +83,10 @@ export const handleRequest = async (message: any): Promise<void> => {
         console.log(`[handleRequest] Message related to last activity=${isMessageRelatedToLastActivity.related}`);
 
         if (!isMessageRelatedToLastActivity.related) {
-          await handleIdleWorkflow(db, chatId, user, unprocessedMessages);
+          await handleIdleWorkflow(db, chatId, user, message.text);
         } else {
           await handleBrowsingWorkflow(db, chatId, user, lastActivity, unprocessedMessages);
-        }
+        } */
         break;
       default:
         console.warn(`[handleRequest] Unknown state=${user.state} — sending fallback message`);

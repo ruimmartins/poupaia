@@ -46,7 +46,7 @@ export const generateEmbedding = async (contents: string[]): Promise<ContentEmbe
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
     const response = await ai.models.embedContent({
-      model: 'gemini-embedding-002',
+      model: 'gemini-embedding-001',
       contents,
       config: {
         outputDimensionality: EMBEDDING_DIMENSION,

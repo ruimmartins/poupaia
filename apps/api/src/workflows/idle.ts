@@ -39,14 +39,12 @@ export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, mes
       if (products.length > 0) {
         await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.PRODUCTS_FOUND(products.length))));
 
-        const productsToSend = products.slice(0, 10);
-
-        await sendProductsToUser(db, user.id, chatId, productsToSend);
+        const sentProducts = await sendProductsToUser(db, user.id, chatId, products);
 
         await createOrUpdateActivity(db, {
           userId: user.id,
           startedAt: new Date().toISOString(),
-          productsSent: productsToSend,
+          productsSent: sentProducts,
           trigger: messages.map(m => m.text).join('\n'),
           intent,
         });

@@ -20,6 +20,7 @@ const main = async () => {
   const tasks = new Listr([
     {
       title: 'Wating...',
+      skip: process.env.NO_SCRAPING === 'true', // Pular em produção
       task: async (ctx, task) => {
         const oneHour = 1000 * 60 * 60;
         const delay = Math.floor(Math.random() * oneHour); // Delay aleatório entre 0h e 1h
@@ -36,6 +37,7 @@ const main = async () => {
     },
     {
       title: 'Scraping Amazon em paralelo...',
+      skip: process.env.NO_SCRAPING === 'true', // Pular em produção
       task: async (ctx, task) => {
         const scrapingTasks = Array.from({ length: PARALLEL_TASKS }, (_, index) =>
           scrapAmazon(index, PARALLEL_TASKS)
@@ -60,6 +62,7 @@ const main = async () => {
     },
     {
       title: 'A guardar produtos no MongoDB',
+      skip: process.env.NO_SCRAPING === 'true', // Pular em produção
       task: async (ctx, task) => {
         const products: Product[] = ctx.products;
 

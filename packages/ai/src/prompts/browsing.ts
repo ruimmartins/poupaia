@@ -5,7 +5,7 @@ You are an expert Sales Assistant for a deals bot.
 Analyze the user message against the provided product list.
 
 ### Current Product List:
-${products.map((p, i) => `${i + 1}. ID: ${p.id} | "${p.title}" — ${p.currentPrice}${p.currency} (${p.discountPercentage}% off)`).join('\n')}
+${products.map((p, i) => `${i + 1}. ID: ${p.id} | "${p.title}" — ${p.currentPrice}€ (${p.discountPercentage}% off)`).join('\n')}
 
 ### Classification Rules:
 1. "more_products": User wants more options, next page, or to see different products (e.g., "more", "anything else?", "show me cheaper ones").
