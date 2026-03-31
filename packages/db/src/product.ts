@@ -58,12 +58,22 @@ export const deleteInvalidProducts = async (db: Db) => {
   });
 };
 
+const EXPECTED_EMBEDDING_DIMENSION = 1578;
+
 export const getAllProductsWithoutEmbeddings = async (db: Db): Promise<Product[]> => {
   const collection = await getProductsCollection(db);
 
   return await collection
     .find({
-      $or: [{ embedding: { $exists: false } }, { embedding: { $size: 0 } }],
+      $or: [
+        { embedding: { $exists: false } },
+        { embedding: { $size: 0 } },
+        {
+          $expr: {
+            $ne: [{ $size: { $ifNull: ['$embedding', []] } }, EXPECTED_EMBEDDING_DIMENSION],
+          },
+        },
+      ],
     })
     .toArray();
 };
@@ -104,37 +114,48 @@ export const searchProducts = async (db: Db, filters: Partial<QueryFilters> = {}
     query.discountPercentage = { $gte: filters.minDiscount };
   }
 
+  // createdAt is NOT a filter field in the Atlas vectorSearch index,
+  // so it must be applied as a $match stage after $vectorSearch.
+  const postMatchQuery: any = {};
+
   if (filters.minCreatedAt || filters.maxCreatedAt) {
-    query.createdAt = {};
+    postMatchQuery.createdAt = {};
     if (filters.minCreatedAt) {
-      query.createdAt.$gte = filters.minCreatedAt;
+      postMatchQuery.createdAt.$gte = filters.minCreatedAt;
     }
     if (filters.maxCreatedAt) {
-      query.createdAt.$lte = filters.maxCreatedAt;
+      postMatchQuery.createdAt.$lte = filters.maxCreatedAt;
     }
   }
 
   const hasFilterQuery = Object.keys(query).length > 0;
+  const hasPostMatchQuery = Object.keys(postMatchQuery).length > 0;
 
-  const results = await collection
-    .aggregate<Product>([
-      {
-        $vectorSearch: {
-          index: vectorIndexName,
-          path: 'embedding',
-          queryVector: filters.embeddings,
-          ...(hasFilterQuery ? { filter: query } : {}),
-          numCandidates: 1000,
-          limit: 20,
-        },
+  const pipeline: object[] = [
+    {
+      $vectorSearch: {
+        index: vectorIndexName,
+        path: 'embedding',
+        queryVector: filters.embeddings,
+        ...(hasFilterQuery ? { filter: query } : {}),
+        numCandidates: 1000,
+        limit: 100,
       },
-      {
-        $addFields: {
-          score: { $meta: 'vectorSearchScore' },
-        },
+    },
+    {
+      $addFields: {
+        score: { $meta: 'vectorSearchScore' },
       },
-    ])
-    .toArray();
+    },
+  ];
+
+  if (hasPostMatchQuery) {
+    pipeline.push({ $match: postMatchQuery });
+  }
+
+  pipeline.push({ $limit: 20 });
+
+  const results = await collection.aggregate<Product>(pipeline).toArray();
 
   return results;
 };

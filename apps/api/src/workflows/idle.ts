@@ -1,8 +1,9 @@
 import { idlePrompt, IdleIntentTypeEnum, processUserMessage, SearchResponse, generateEmbedding } from '@poupaia/ai';
 import { Message, searchProducts, getAllCategories, createOrUpdateActivity, setMessegesAsProcessed, User, updateUserState } from '@poupaia/db';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
-import { sendProductsToUser } from '@poupaia/shared';
+import { sendProductsToUser, mergeOrAppendQuery } from '@poupaia/shared';
 import { Db } from 'mongodb';
+import { handleInterestsWorkflow } from './interests';
 
 export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, messages: Message[]): Promise<void> => {
   console.log(`[idleWorkflow] Start chatId=${chatId} userId=${user.id} messages=${messages.length}`);
@@ -31,8 +32,9 @@ export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, mes
       console.log(`[idleWorkflow] Embeddings generated for query="${intent.query[0]}" categories="${intent.categories.join(', ')}" with length=${intent.embeddings.length}`);
 
       console.log(`[idleWorkflow] AI result type=${type} intent=${JSON.stringify({ ...intent, embeddings: '...hidden...' })}`);
-      /* console.log(`[idleWorkflow] ${type} — searching products with intent=${JSON.stringify(intent)}`); */
-      await updateUserState(db, user.id, { queries: [...(user.queries || []), { query: intent.query[0], embeddings: intent.embeddings }] });
+
+      const updatedQueries = mergeOrAppendQuery(user.queries || [], intent.query[0], intent.embeddings);
+      await updateUserState(db, user.id, { queries: updatedQueries });
       const products = await searchProducts(db, intent);
       console.log(`[idleWorkflow] Products found=${products.length}`);
 
@@ -54,10 +56,18 @@ export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, mes
 
       break;
 
+    case IdleIntentTypeEnum.SAVE_INTERESTS:
+      await handleInterestsWorkflow(db, chatId, user, messages);
+      break;
+
     case IdleIntentTypeEnum.IRRELEVANT:
     default:
-      console.log(`[idleWorkflow] type=${type} — sending irrelevant message`);
-      await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.IRRELEVANT_MESSAGE)));
+      console.log(`[idleWorkflow] type=${type} — sending not understood message`);
+      await sendTelegramMessage(chatId, MESSAGES.NOT_UNDERSTOOD_IDLE, [
+        { text: '🔍 Pesquisar', callback_data: 'new_search' },
+        { text: '🔔 Interesses', callback_data: 'save_interests' },
+        { text: '🎁 Prenda', callback_data: 'gift' },
+      ]);
       break;
   }
 

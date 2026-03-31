@@ -2,7 +2,7 @@ import { ContentEmbedding, GoogleGenAI } from '@google/genai';
 import { Contents } from './types/gemini-types';
 import { Product } from '@poupaia/db';
 
-const EMBEDDING_DIMENSION = 768;
+const EMBEDDING_DIMENSION = 1578;
 
 export const processUserMessage = async <T>(systemInstruction: string, contents: Contents[]): Promise<T> => {
   try {

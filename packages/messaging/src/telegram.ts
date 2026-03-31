@@ -82,7 +82,7 @@ export const formatProductsForUser = (products: Product[]): TelegramMessage[] =>
     let message = `${emoji} *${safeTitle}*\n\n`;
 
     if (discount && originalPrice) {
-      message += `antes: ~${safeOldPrice}€~ \n*🔥 AGORA: ${safeNewPrice}€* \\(\\-${safeDiscount}%\\) 🔥\n`;
+      message += `antes: ~${safeOldPrice}€~\n*🔥 AGORA: ${safeNewPrice}€* \\(\\-${safeDiscount}%\\) 🔥\n`;
     }
 
     if (product.expiresAt) {

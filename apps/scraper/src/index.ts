@@ -111,22 +111,40 @@ const main = async () => {
       title: 'A enviar novos produtos aos utilizadores',
       task: async (ctx, task) => {
         const users = await getAllUsers(ctx.db);
+        let totalSent = 0;
+
+        console.log(`[notifyUsers] Found ${users.length} users`);
 
         for (const user of users) {
-          if (user.queries && user.queries.length > 0) {
-            for (const query of user.queries) {
-              // Gerar embedding para a query string
-              const foundProducts: Product[] = await searchProducts(ctx.db, {
-                embeddings: query.embeddings,
-                minCreatedAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-              });
+          if (!user.queries || user.queries.length === 0) {
+            console.log(`[notifyUsers] User ${user.id} has no queries, skipping`);
+            continue;
+          }
 
-              if (foundProducts.length > 0) {
-                await sendProductsToUser(ctx.db, user.id, user.chatId, foundProducts);
-              }
+          for (const query of user.queries) {
+            if (!query.embeddings || query.embeddings.length === 0) {
+              console.log(`[notifyUsers] User ${user.id} query="${query.query}" has no embeddings, skipping`);
+              continue;
+            }
+
+            const minCreatedAt = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
+            console.log(`[notifyUsers] User ${user.id} query="${query.query}" embeddingLen=${query.embeddings.length} minCreatedAt=${minCreatedAt}`);
+
+            const foundProducts: Product[] = await searchProducts(ctx.db, {
+              embeddings: query.embeddings,
+              minCreatedAt,
+            });
+
+            console.log(`[notifyUsers] User ${user.id} query="${query.query}" foundProducts=${foundProducts.length}`);
+
+            if (foundProducts.length > 0) {
+              await sendProductsToUser(ctx.db, user.id, user.chatId, foundProducts);
+              totalSent += foundProducts.length;
             }
           }
         }
+
+        task.title = `Novos produtos enviados: ${totalSent} (${users.length} utilizadores)`;
       },
     },
   ]);

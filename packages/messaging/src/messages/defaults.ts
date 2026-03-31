@@ -1,4 +1,44 @@
 export const MESSAGES = {
+  START: (firstName?: string) =>
+    `Olá${firstName ? `, ${firstName}` : ''}\\! 👋 Bem\\-vindo ao *Poupaia* — o teu assistente de caça a pechinchas\\! 🛒
+
+Aqui está o que consigo fazer por ti:
+
+🔍 *Pesquisar produtos* — diz\\-me o que precisas e eu vou à luta
+_"quero umas auscultadores bluetooth abaixo de 50€"_
+
+🔔 *Guardar os teus interesses* — diz o que gostas e aviso\\-te quando aparecer algo
+_"estou interessado em sapatilhas, roupa de criança e gadgets"_
+
+🎁 *Ajudar com prendas* — sem ideias para o aniversário da mãe? problema meu
+_"preciso de uma prenda para o dia da mãe até 30€"_
+
+Quando encontrar produtos, podes pedir para ver mais ou obter detalhes sobre qualquer um deles\\.
+
+Prontos? Diz\\-me o que andas à procura\\! 🚀`,
+  NOT_UNDERSTOOD_IDLE:
+    `Hmm, não percebi bem o que quiseste dizer\\. 🤔 Mas não faz mal, estou aqui para ajudar\\!
+
+Aqui estão algumas coisas que podes fazer:
+
+🔍 *Pesquisar produtos*
+_"quero umas sapatilhas de corrida abaixo de 80€"_
+
+🔔 *Guardar interesses* para receber alertas automáticos
+_"estou interessado em roupa de criança e gadgets"_
+
+🎁 *Pedir sugestões de presentes*
+_"preciso de uma prenda para o dia do pai até 50€"_
+
+Tenta outra vez, desta vez ainda melhor\\! 💪`,
+  NOT_UNDERSTOOD_BROWSING:
+    `Não percebi\\! 😅 Mas olha, enquanto estamos aqui, podes\\:
+
+👀 *Ver mais produtos* semelhantes à tua pesquisa anterior
+💬 *Pedir mais info* sobre um produto que te enviei
+🔍 *Fazer uma nova pesquisa* do zero
+
+O que preferes\\?`,
   LOADING: [
     'Já estou a ver isso! Só um segundinho... 😎',
     'Já estou a tratar disso! Só um instante, chefe! 😎',
@@ -44,7 +84,7 @@ export const MESSAGES = {
     '🚫 Estás em modo pausa. Vai beber um café e volta já!',
     'Opa, estás bloqueado! Mas só por um bocadinho. ⏳',
     '🚫 Foste apanhado a enviar mensagens malucas! Tenta depois.',
-    'O sistema disse “não”! 🚫',
+    'O sistema disse "não"! 🚫',
     '🚫 Estás temporariamente fora de serviço. Relaxa!',
     'Opa, bloqueio ativado! Vai dar uma volta e volta depois. 🚶‍♂️',
     '🚫 Estás bloqueado, mas não é para sempre!',

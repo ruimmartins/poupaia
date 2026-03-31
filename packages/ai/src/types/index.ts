@@ -2,6 +2,7 @@ export enum IdleIntentTypeEnum {
   IRRELEVANT = 'irrelevant',
   SEARCH = 'search',
   GIFT = 'gift',
+  SAVE_INTERESTS = 'save_interests',
 }
 
 export enum BrowsingIntentTypeEnum {
@@ -11,7 +12,7 @@ export enum BrowsingIntentTypeEnum {
 }
 
 export enum InterestsIntentTypeEnum {
-  ADD_INTERESTS = 'add_interests',
+  SAVE_INTERESTS = 'save_interests',
   REMOVE_INTERESTS = 'remove_interests',
   IRRELEVANT = 'irrelevant',
 }

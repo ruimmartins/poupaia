@@ -19,6 +19,12 @@ export const handleRequest = async (message: any): Promise<void> => {
     const user = await getOrCreateUser(db, userId, chatId, { ...message.from });
     console.log(`[handleRequest] User state=${user.state} userId=${userId}`);
 
+    if (message.text?.trim() === '/start') {
+      console.log('[handleRequest] /start command received');
+      await sendTelegramMessage(chatId, MESSAGES.START(message.from?.first_name));
+      return;
+    }
+
     await saveMessage(db, {
       id: null,
       type: 'user',
@@ -74,10 +80,10 @@ export const handleRequest = async (message: any): Promise<void> => {
           await sendTelegramMessage(chatId, escapeMarkdownV2('Claro! O que você gostaria de encontrar?'));
           await updateUserState(db, userId, { state: UserStateEnum.IDLE });
         } else {
-          await sendTelegramMessage(chatId, escapeMarkdownV2('Não percebi direito, mas estou aqui para ajudar! Você pode me dizer o que gostaria de encontrar ou clicar em "Ver mais" para receber mais produtos relacionados à sua última busca.'), [
-            { text: 'Ver mais', callback_data: UserActionEnum.VIEW_MORE },
-            { text: 'Mais info', callback_data: UserActionEnum.MORE_INFO },
-            { text: 'Nova Pesquisa', callback_data: UserActionEnum.NEW_SEARCH },
+          await sendTelegramMessage(chatId, MESSAGES.NOT_UNDERSTOOD_BROWSING, [
+            { text: '👀 Ver mais', callback_data: UserActionEnum.VIEW_MORE },
+            { text: '💬 Mais info', callback_data: UserActionEnum.MORE_INFO },
+            { text: '🔍 Nova pesquisa', callback_data: UserActionEnum.NEW_SEARCH },
           ]);
         }
         break;

@@ -2,6 +2,7 @@ import { Db } from 'mongodb';
 import { Product, saveMessage, updateUserState, UserStateEnum } from '@poupaia/db';
 import { sendTelegramMessage, sendTelegramPhoto, formatProductsForUser, getRandomMessage, MESSAGES, escapeMarkdownV2, QUESTIONS } from '@poupaia/messaging';
 import { TelegramAction } from 'packages/messaging/src/types/telegram-action';
+import { isValidImageUrl } from './url-utils';
 
 const PRODUCTS_PER_PAGE = 10;
 
@@ -12,7 +13,7 @@ export const sendProductsToUser = async (db: Db, userId: number, chatId: number,
 
   const productMessages = formatProductsForUser(sentProducts);
   for (const message of productMessages) {
-    if (message.imageUrl) {
+    if (message.imageUrl && (await isValidImageUrl(message.imageUrl))) {
       await sendTelegramPhoto(chatId, message.imageUrl, message.text);
     } else {
       await sendTelegramMessage(chatId, message.text);

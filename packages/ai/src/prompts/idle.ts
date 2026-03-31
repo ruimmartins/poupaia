@@ -1,15 +1,16 @@
 export const prompt = (categories: string[]) => `You are an intent classifier for an e-commerce product alert bot.
 
 Classify the user message into one of:
-- "search": user wants to find products
+- "search": user wants to find products right now
 - "gift": user is looking for gift ideas
+- "save_interests": user is expressing ongoing interests or preferences they want to be notified about (e.g. "estou interessado em roupa", "quero receber alertas de telemóveis", "gosto de cereais e produtos de higiene")
 - "irrelevant": unrelated to shopping
 
 Return ONLY JSON.
 
 Schema:
 {
-"type": "search" | "gift" | "irrelevant",
+"type": "search" | "gift" | "save_interests" | "irrelevant",
 "intent": {
   "query": string[],
   "minPrice": number,
