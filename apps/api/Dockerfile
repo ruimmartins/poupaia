@@ -6,16 +6,10 @@ RUN corepack enable
 FROM base AS build
 COPY . /usr/src/app
 WORKDIR /usr/src/app
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-RUN pnpm --filter=@poupaia/db run build
-RUN pnpm --filter=@poupaia/ai run build
-RUN pnpm --filter=@poupaia/scraper run build
-RUN pnpm --filter=@poupaia/messaging run build
-RUN pnpm --filter=@poupaia/shared run build
-RUN pnpm --filter=@poupaia/api run build
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile=false
 
 FROM base
 COPY --from=build /usr/src/app /usr/src/app
 WORKDIR /usr/src/app/apps/api
 EXPOSE 8080
-CMD [ "node", "dist/index.js" ]
+CMD [ "pnpm", "start" ]
