@@ -7,9 +7,10 @@ FROM base AS build
 COPY . /usr/src/app
 WORKDIR /usr/src/app
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN pnpm run build
 
 FROM base
 COPY --from=build /usr/src/app /usr/src/app
 WORKDIR /usr/src/app/apps/api
 EXPOSE 8080
-CMD [ "pnpm", "start" ]
+CMD [ "node", "dist/index.js" ]
