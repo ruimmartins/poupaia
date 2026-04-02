@@ -160,17 +160,19 @@ export const searchProducts = async (db: Db, filters: Partial<QueryFilters> = {}
   return results;
 };
 
-export const getBestPromotions = async (db: Db, limit: number = 10): Promise<Product[]> => {
+export const getBestPromotions = async (db: Db, limit: number = 10, excludeProducts: string[] = []): Promise<Product[]> => {
   const collection = await getProductsCollection(db);
 
   const minCreatedAt = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
 
-  return await collection
-    .find({
-      createdAt: { $gte: minCreatedAt },
-      discountPercentage: { $gt: 0 },
-    })
-    .sort({ discountPercentage: -1 })
-    .limit(limit)
-    .toArray();
+  const query: any = {
+    createdAt: { $gte: minCreatedAt },
+    discountPercentage: { $gt: 0 },
+  };
+
+  if (excludeProducts.length > 0) {
+    query.id = { $nin: excludeProducts };
+  }
+
+  return await collection.find(query).sort({ discountPercentage: -1 }).limit(limit).toArray();
 };

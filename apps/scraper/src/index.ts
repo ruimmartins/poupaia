@@ -111,8 +111,8 @@ const main = async () => {
       title: 'A enviar novos produtos aos utilizadores',
       task: async (ctx, task) => {
         const users = await getAllUsers(ctx.db);
-        let totalSent = 0;
-        let totalPromotionsSent = 0;
+        let totalInterestProducts = 0;
+        let totalPromotions = 0;
 
         console.log(`[notifyUsers] Found ${users.length} users`);
 
@@ -122,7 +122,8 @@ const main = async () => {
             continue;
           }
 
-          let userFoundProducts = false;
+          const allFoundProducts: Product[] = [];
+          const foundProductIds: string[] = [];
 
           for (const query of user.queries) {
             if (!query.embeddings || query.embeddings.length === 0) {
@@ -140,29 +141,43 @@ const main = async () => {
 
             console.log(`[notifyUsers] User ${user.id} query="${query.query}" foundProducts=${foundProducts.length}`);
 
-            if (foundProducts.length > 0) {
-              await sendProductsToUser(ctx.db, user.id, user.chatId, foundProducts);
-              totalSent += foundProducts.length;
-              userFoundProducts = true;
+            for (const product of foundProducts) {
+              if (!foundProductIds.includes(product.id)) {
+                allFoundProducts.push(product);
+                foundProductIds.push(product.id);
+              }
             }
           }
 
-          // Se não encontrou produtos dos interesses do utilizador, envia as melhores promoções
-          if (!userFoundProducts) {
-            console.log(`[notifyUsers] User ${user.id} has no products from interests, sending best promotions`);
-            const bestPromotions = await getBestPromotions(ctx.db, 10);
+          const TARGET_PRODUCTS = 10;
+          const interestProductsCount = allFoundProducts.length;
+          totalInterestProducts += interestProductsCount;
+
+          console.log(`[notifyUsers] User ${user.id} found ${interestProductsCount} products from interests`);
+
+          // Se encontrou menos de 10 produtos, completa com as melhores promoções
+          if (interestProductsCount < TARGET_PRODUCTS) {
+            const neededPromotions = TARGET_PRODUCTS - interestProductsCount;
+            console.log(`[notifyUsers] User ${user.id} needs ${neededPromotions} more products, fetching best promotions`);
+
+            const bestPromotions = await getBestPromotions(ctx.db, neededPromotions, foundProductIds);
 
             if (bestPromotions.length > 0) {
-              await sendProductsToUser(ctx.db, user.id, user.chatId, bestPromotions);
-              totalPromotionsSent += bestPromotions.length;
-              console.log(`[notifyUsers] User ${user.id} sent ${bestPromotions.length} best promotions`);
-            } else {
-              console.log(`[notifyUsers] User ${user.id} no promotions available`);
+              allFoundProducts.push(...bestPromotions);
+              totalPromotions += bestPromotions.length;
+              console.log(`[notifyUsers] User ${user.id} added ${bestPromotions.length} promotions`);
             }
+          }
+
+          if (allFoundProducts.length > 0) {
+            await sendProductsToUser(ctx.db, user.id, user.chatId, allFoundProducts);
+            console.log(`[notifyUsers] User ${user.id} sent ${allFoundProducts.length} total products (${interestProductsCount} interests + ${allFoundProducts.length - interestProductsCount} promotions)`);
+          } else {
+            console.log(`[notifyUsers] User ${user.id} no products to send`);
           }
         }
 
-        task.title = `Novos produtos enviados: ${totalSent} produtos de interesse, ${totalPromotionsSent} promoções (${users.length} utilizadores)`;
+        task.title = `Novos produtos enviados: ${totalInterestProducts} de interesse + ${totalPromotions} promoções = ${totalInterestProducts + totalPromotions} total (${users.length} utilizadores)`;
       },
     },
   ]);
