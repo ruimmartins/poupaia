@@ -3,7 +3,7 @@ import path from 'path';
 import { existsSync } from 'fs';
 import { Listr } from 'listr2';
 import { scrapAmazon } from './amazon';
-import { connectToDatabase, closeConnection, Product, createOrUpdateProducts, deleteInvalidProducts, getAllUsers, searchProducts, getProductsCollection, getAllProductsWithoutEmbeddings } from '@poupaia/db';
+import { connectToDatabase, closeConnection, Product, createOrUpdateProducts, deleteInvalidProducts, getAllUsers, searchProducts, getProductsCollection, getAllProductsWithoutEmbeddings, getBestPromotions } from '@poupaia/db';
 import { sendProductsToUser } from '@poupaia/shared';
 import { generateEmbedding } from '@poupaia/ai';
 
@@ -112,6 +112,7 @@ const main = async () => {
       task: async (ctx, task) => {
         const users = await getAllUsers(ctx.db);
         let totalSent = 0;
+        let totalPromotionsSent = 0;
 
         console.log(`[notifyUsers] Found ${users.length} users`);
 
@@ -120,6 +121,8 @@ const main = async () => {
             console.log(`[notifyUsers] User ${user.id} has no queries, skipping`);
             continue;
           }
+
+          let userFoundProducts = false;
 
           for (const query of user.queries) {
             if (!query.embeddings || query.embeddings.length === 0) {
@@ -140,11 +143,26 @@ const main = async () => {
             if (foundProducts.length > 0) {
               await sendProductsToUser(ctx.db, user.id, user.chatId, foundProducts);
               totalSent += foundProducts.length;
+              userFoundProducts = true;
+            }
+          }
+
+          // Se não encontrou produtos dos interesses do utilizador, envia as melhores promoções
+          if (!userFoundProducts) {
+            console.log(`[notifyUsers] User ${user.id} has no products from interests, sending best promotions`);
+            const bestPromotions = await getBestPromotions(ctx.db, 10);
+
+            if (bestPromotions.length > 0) {
+              await sendProductsToUser(ctx.db, user.id, user.chatId, bestPromotions);
+              totalPromotionsSent += bestPromotions.length;
+              console.log(`[notifyUsers] User ${user.id} sent ${bestPromotions.length} best promotions`);
+            } else {
+              console.log(`[notifyUsers] User ${user.id} no promotions available`);
             }
           }
         }
 
-        task.title = `Novos produtos enviados: ${totalSent} (${users.length} utilizadores)`;
+        task.title = `Novos produtos enviados: ${totalSent} produtos de interesse, ${totalPromotionsSent} promoções (${users.length} utilizadores)`;
       },
     },
   ]);
