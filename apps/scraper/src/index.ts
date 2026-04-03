@@ -117,6 +117,11 @@ const main = async () => {
         console.log(`[notifyUsers] Found ${users.length} users`);
 
         for (const user of users) {
+          if (!user.chatId) {
+            console.log(`[notifyUsers] User ${user.id} has no chatId, skipping`);
+            continue;
+          }
+          
           if (!user.queries || user.queries.length === 0) {
             console.log(`[notifyUsers] User ${user.id} has no queries, skipping`);
             continue;

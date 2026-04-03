@@ -9,9 +9,22 @@ export const getOrCreateUser = async (db: Db, userId: number, chatId: number, pr
   const existingUser = await collection.findOne({ id: userId });
 
   if (existingUser) {
+    const updateFields: any = {};
+    
     if (profile) {
-      await collection.updateOne({ id: userId }, { $set: { profile: { ...existingUser.profile, ...profile } } });
+      updateFields.profile = { ...existingUser.profile, ...profile };
     }
+    
+    // Garantir que chatId está sempre atualizado
+    if (existingUser.chatId !== chatId) {
+      updateFields.chatId = chatId;
+    }
+    
+    if (Object.keys(updateFields).length > 0) {
+      await collection.updateOne({ id: userId }, { $set: updateFields });
+      return { ...existingUser, ...updateFields };
+    }
+    
     return existingUser;
   }
 
