@@ -1,7 +1,6 @@
 import { Db } from 'mongodb';
 import { Product, saveMessage, updateUserState, UserStateEnum } from '@poupaia/db';
-import { sendTelegramMessage, sendTelegramPhoto, formatProductsForUser, getRandomMessage, MESSAGES, escapeMarkdownV2, QUESTIONS } from '@poupaia/messaging';
-import { TelegramAction } from 'packages/messaging/src/types/telegram-action';
+import { sendTelegramMessage, sendTelegramPhoto, formatProductsForUser, getRandomMessage, MESSAGES, escapeMarkdownV2, QUESTIONS, TelegramAction } from '@poupaia/messaging';
 import { isValidImageUrl } from './url-utils';
 
 const PRODUCTS_PER_PAGE = 10;

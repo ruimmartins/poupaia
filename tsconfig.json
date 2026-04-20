@@ -1,5 +1,13 @@
 {
-  "extends": "./tsconfig.base.json",
-  "include": ["apps/**/*", "packages/**/*", "api/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "files": [],
+  "references": [
+    { "path": "./packages/db" },
+    { "path": "./packages/ai" },
+    { "path": "./packages/messaging" },
+    { "path": "./packages/shared" },
+    { "path": "./packages/scraper" },
+    { "path": "./apps/api" },
+    { "path": "./apps/scraper" },
+    { "path": "./apps/tasks" }
+  ]
 }

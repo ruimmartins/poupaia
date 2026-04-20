@@ -1,21 +1,16 @@
 {
-  // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
     "target": "ES2022",
     "module": "CommonJS",
-    "moduleResolution": "Node",
+    "lib": ["ES2022"],
     "strict": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "outDir": "dist",
-    "baseUrl": ".",
-    "paths": {
-      "@poupaia/ai": ["packages/ai/src/index.ts"],
-      "@poupaia/db": ["packages/db/src/index.ts"],
-      "@poupaia/messaging": ["packages/messaging/src/index.ts"],
-      "@poupaia/shared": ["packages/shared/src/index.ts"],
-      "@poupaia/scraper": ["packages/scraper/src/index.ts"]
-    }
+    "resolveJsonModule": true,
+    "declaration": true,
+    "sourceMap": true,
+    "composite": true,
+    "incremental": true
   }
 }

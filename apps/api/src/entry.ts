@@ -1,10 +1,10 @@
 import { handleIdleWorkflow } from './workflows/idle';
 import { handleBrowsingWorkflow } from './workflows/browsing';
-import { handleInterestsCommand, handleCategoryCallback } from './workflows/interests';
+import { handleInterestsCommand } from './workflows/interests';
 import { closeConnection, connectToDatabase, createOrUpdateActivity, getLastActivity, getOrCreateUser, getUnprocessedMessagesForUser, saveMessage, searchProducts, updateUserState, UserStateEnum } from '@poupaia/db';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
 import { processUserMessage, relatedMessagesPrompt } from '@poupaia/ai';
-import { sendProductsToUser } from 'packages/shared/src/send-products-telegram';
+import { sendProductsToUser } from '@poupaia/shared';
 import { UserActionEnum } from './types/user-actions';
 
 export const handleRequest = async (message: any): Promise<void> => {

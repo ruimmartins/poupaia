@@ -39,8 +39,16 @@ export const handleCategoryCallback = async (db: Db, chatId: number, userId: num
   }
 
   if (callbackData.startsWith('cat_')) {
-    // Toggle categoria
-    const category = callbackData.replace('cat_', '');
+    // Toggle categoria usando índice
+    const categoryIndex = parseInt(callbackData.replace('cat_', ''), 10);
+    const allCategories = await getTopLevelCategories(db);
+    const category = allCategories[categoryIndex];
+    
+    if (!category) {
+      console.error(`[handleCategoryCallback] Invalid category index: ${categoryIndex}`);
+      return;
+    }
+    
     const index = state.selectedCategories.indexOf(category);
     
     if (index > -1) {
@@ -84,18 +92,27 @@ const showCategoriesPage = async (db: Db, chatId: number, userId: number, page: 
   const allCategories = await getTopLevelCategories(db);
   const state = userCategoryStates.get(userId) || { selectedCategories: [], page: 0 };
 
+  if (allCategories.length === 0) {
+    await sendTelegramMessage(chatId, escapeMarkdownV2('Ainda não há categorias disponíveis na base de dados.'));
+    userCategoryStates.delete(userId);
+    await updateUserState(db, userId, { state: UserStateEnum.IDLE });
+    return;
+  }
+
   const totalPages = Math.ceil(allCategories.length / CATEGORIES_PER_PAGE);
   const startIndex = page * CATEGORIES_PER_PAGE;
   const endIndex = Math.min(startIndex + CATEGORIES_PER_PAGE, allCategories.length);
   const categoriesOnPage = allCategories.slice(startIndex, endIndex);
 
   // Criar botões para as categorias
-  const categoryButtons = categoriesOnPage.map(category => {
+  const categoryButtons = categoriesOnPage.map((category, index) => {
     const isSelected = state.selectedCategories.includes(category);
+    // Usar índice em vez do nome completo para callback_data (evita limite de 64 bytes do Telegram)
+    const categoryIndex = allCategories.indexOf(category);
     return [
       {
         text: `${isSelected ? '✅' : '⬜'} ${category}`,
-        callback_data: `cat_${category}`,
+        callback_data: `cat_${categoryIndex}`,
       },
     ];
   });
