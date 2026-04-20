@@ -6,8 +6,16 @@ import { isValidImageUrl } from './url-utils';
 
 const PRODUCTS_PER_PAGE = 10;
 
-export const sendProductsToUser = async (db: Db, userId: number, chatId: number, products: Product[]) => {
-  const sentProducts: Product[] = products.slice(0, PRODUCTS_PER_PAGE); // Limitar a 10 produtos para evitar sobrecarregar o usuário
+export const sendProductsToUser = async (
+  db: Db,
+  userId: number,
+  chatId: number,
+  products: Product[],
+  fromScraper: boolean = false
+) => {
+  // Se for do scraper, enviar todos os produtos, caso contrário limitar a 10
+  const maxProducts = fromScraper ? products.length : PRODUCTS_PER_PAGE;
+  const sentProducts: Product[] = products.slice(0, maxProducts);
 
   await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.PRODUCTS_FOUND(sentProducts.length))));
 
@@ -18,6 +26,11 @@ export const sendProductsToUser = async (db: Db, userId: number, chatId: number,
     } else {
       await sendTelegramMessage(chatId, message.text);
     }
+  }
+
+  // Se for do scraper, não enviar ações nem atualizar estado
+  if (fromScraper) {
+    return sentProducts;
   }
 
   await updateUserState(db, userId, { state: UserStateEnum.BROWSING });

@@ -22,5 +22,6 @@ export interface User {
   state: UserStateEnum;
   profile: Profile;
   queries?: UserQueries[];
+  interests?: string[];
   chatId: number;
 }

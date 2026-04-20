@@ -9,7 +9,7 @@ export const escapeMarkdownV2 = (text: string | number): string => {
   return text.toString().replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
 };
 
-export const sendTelegramMessage = async (chat_id: string | number, text: string, actions?: TelegramAction[]) => {
+export const sendTelegramMessage = async (chat_id: string | number, text: string, actions?: TelegramAction[] | TelegramAction[][]) => {
   try {
     const body: any = {
       chat_id,
@@ -18,8 +18,10 @@ export const sendTelegramMessage = async (chat_id: string | number, text: string
     };
 
     if (actions && actions.length > 0) {
+      // Se for um array bidimensional, usar diretamente; caso contrário, criar uma linha
+      const keyboard = Array.isArray(actions[0]) ? actions : [actions];
       body['reply_markup'] = {
-        inline_keyboard: [actions],
+        inline_keyboard: keyboard,
       };
     }
 
@@ -33,6 +35,38 @@ export const sendTelegramMessage = async (chat_id: string | number, text: string
     const data = await response.json();
     await new Promise(resolve => setTimeout(resolve, 1000));
     if (!data.ok) throw new Error(`Telegram API error: ${data.description} with text: ${text}`);
+    return data;
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const editTelegramMessage = async (chat_id: string | number, message_id: number, text: string, actions?: TelegramAction[] | TelegramAction[][]) => {
+  try {
+    const body: any = {
+      chat_id,
+      message_id,
+      text: text,
+      parse_mode: 'MarkdownV2',
+    };
+
+    if (actions && actions.length > 0) {
+      const keyboard = Array.isArray(actions[0]) ? actions : [actions];
+      body['reply_markup'] = {
+        inline_keyboard: keyboard,
+      };
+    }
+
+    console.log(`[editTelegramMessage] Editing message chat_id=${chat_id} message_id=${message_id}`);
+
+    const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/editMessageText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await response.json();
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    if (!data.ok) throw new Error(`Telegram API error: ${data.description}`);
     return data;
   } catch (error) {
     throw error;

@@ -1,6 +1,6 @@
 import { handleIdleWorkflow } from './workflows/idle';
 import { handleBrowsingWorkflow } from './workflows/browsing';
-import { handleInterestsWorkflow } from './workflows/interests';
+import { handleInterestsCommand, handleCategoryCallback } from './workflows/interests';
 import { closeConnection, connectToDatabase, createOrUpdateActivity, getLastActivity, getOrCreateUser, getUnprocessedMessagesForUser, saveMessage, searchProducts, updateUserState, UserStateEnum } from '@poupaia/db';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
 import { processUserMessage, relatedMessagesPrompt } from '@poupaia/ai';
@@ -22,6 +22,13 @@ export const handleRequest = async (message: any): Promise<void> => {
     if (message.text?.trim() === '/start') {
       console.log('[handleRequest] /start command received');
       await sendTelegramMessage(chatId, MESSAGES.START(message.from?.first_name));
+      return;
+    }
+
+    if (message.text?.trim() === '/interesses') {
+      console.log('[handleRequest] /interesses command received');
+      await updateUserState(db, userId, { state: UserStateEnum.SETTING_INTERESTS });
+      await handleInterestsCommand(db, chatId, userId);
       return;
     }
 

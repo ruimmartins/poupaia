@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { handleRequest } from './entry';
+import { handleCallbackQuery } from './callback-handler';
 
 const app = express();
 app.use(express.json());
@@ -14,6 +15,16 @@ app.post('/', async (req, res) => {
 
   try {
     const update = req.body;
+
+    // Lidar com callback queries (botões inline)
+    if (update.callback_query) {
+      console.log('[webhook] Callback query received');
+      res.status(200).send('OK');
+      console.log(`[webhook] Acknowledged callback query id=${updateId} in ${Date.now() - startTime}ms`);
+      await handleCallbackQuery(update.callback_query);
+      console.log(`[webhook] Finished processing callback query id=${updateId} in ${Date.now() - startTime}ms`);
+      return;
+    }
 
     if (!update?.message?.chat?.id) {
       console.warn('[webhook] Bad request — missing message or chat id');

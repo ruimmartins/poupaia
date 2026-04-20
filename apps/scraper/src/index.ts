@@ -111,8 +111,7 @@ const main = async () => {
       title: 'A enviar novos produtos aos utilizadores',
       task: async (ctx, task) => {
         const users = await getAllUsers(ctx.db);
-        let totalInterestProducts = 0;
-        let totalPromotions = 0;
+        let totalSentProducts = 0;
 
         console.log(`[notifyUsers] Found ${users.length} users`);
 
@@ -121,68 +120,44 @@ const main = async () => {
             console.log(`[notifyUsers] User ${user.id} has no chatId, skipping`);
             continue;
           }
-          
-          if (!user.queries || user.queries.length === 0) {
-            console.log(`[notifyUsers] User ${user.id} has no queries, skipping`);
+
+          // Verificar se o utilizador tem categorias de interesse definidas
+          if (!user.interests || user.interests.length === 0) {
+            console.log(`[notifyUsers] User ${user.id} has no interests, skipping`);
             continue;
           }
 
-          const allFoundProducts: Product[] = [];
-          const foundProductIds: string[] = [];
+          // Procurar produtos das categorias de interesse criados na última hora
+          const minCreatedAt = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
+          
+          const productsCollection = await getProductsCollection(ctx.db);
+          
+          // Criar query para encontrar produtos cujas categorias começam com as categorias de interesse
+          const categoryQueries = user.interests.map(interest => ({
+            category: { $regex: `^${interest}`, $options: 'i' },
+          }));
+          
+          const foundProducts = await productsCollection
+            .find({
+              createdAt: { $gte: minCreatedAt },
+              $or: categoryQueries,
+            })
+            .sort({ discountPercentage: -1 })
+            .toArray();
 
-          for (const query of user.queries) {
-            if (!query.embeddings || query.embeddings.length === 0) {
-              console.log(`[notifyUsers] User ${user.id} query="${query.query}" has no embeddings, skipping`);
-              continue;
-            }
+          console.log(`[notifyUsers] User ${user.id} found ${foundProducts.length} products from interests`);
 
-            const minCreatedAt = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
-            console.log(`[notifyUsers] User ${user.id} query="${query.query}" embeddingLen=${query.embeddings.length} minCreatedAt=${minCreatedAt}`);
-
-            const foundProducts: Product[] = await searchProducts(ctx.db, {
-              embeddings: query.embeddings,
-              minCreatedAt,
-            });
-
-            console.log(`[notifyUsers] User ${user.id} query="${query.query}" foundProducts=${foundProducts.length}`);
-
-            for (const product of foundProducts) {
-              if (!foundProductIds.includes(product.id)) {
-                allFoundProducts.push(product);
-                foundProductIds.push(product.id);
-              }
-            }
-          }
-
-          const TARGET_PRODUCTS = 10;
-          const interestProductsCount = allFoundProducts.length;
-          totalInterestProducts += interestProductsCount;
-
-          console.log(`[notifyUsers] User ${user.id} found ${interestProductsCount} products from interests`);
-
-          // Se encontrou menos de 10 produtos, completa com as melhores promoções
-          if (interestProductsCount < TARGET_PRODUCTS) {
-            const neededPromotions = TARGET_PRODUCTS - interestProductsCount;
-            console.log(`[notifyUsers] User ${user.id} needs ${neededPromotions} more products, fetching best promotions`);
-
-            const bestPromotions = await getBestPromotions(ctx.db, neededPromotions, foundProductIds);
-
-            if (bestPromotions.length > 0) {
-              allFoundProducts.push(...bestPromotions);
-              totalPromotions += bestPromotions.length;
-              console.log(`[notifyUsers] User ${user.id} added ${bestPromotions.length} promotions`);
-            }
-          }
-
-          if (allFoundProducts.length > 0) {
-            await sendProductsToUser(ctx.db, user.id, user.chatId, allFoundProducts);
-            console.log(`[notifyUsers] User ${user.id} sent ${allFoundProducts.length} total products (${interestProductsCount} interests + ${allFoundProducts.length - interestProductsCount} promotions)`);
+          if (foundProducts.length > 0) {
+            // Enviar todos os produtos encontrados (sem limite de 10)
+            await sendProductsToUser(ctx.db, user.id, user.chatId, foundProducts, true);
+            totalSentProducts += foundProducts.length;
+            console.log(`[notifyUsers] User ${user.id} sent ${foundProducts.length} products`);
           } else {
             console.log(`[notifyUsers] User ${user.id} no products to send`);
           }
         }
 
-        task.title = `Novos produtos enviados: ${totalInterestProducts} de interesse + ${totalPromotions} promoções = ${totalInterestProducts + totalPromotions} total (${users.length} utilizadores)`;
+        task.title = `Novos produtos enviados: ${totalSentProducts} total (${users.length} utilizadores)`;
       },
     },
   ]);

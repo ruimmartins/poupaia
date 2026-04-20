@@ -1,106 +1,140 @@
-import { User, Message, updateUserState, getAllCategories, searchProducts } from '@poupaia/db';
-import { interestsPrompt, InterestsIntentTypeEnum, InterestsResponse, processUserMessage, generateEmbedding } from '@poupaia/ai';
-import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
-import { mergeOrAppendQuery, sendProductsToUser } from '@poupaia/shared';
+import { User, updateUserState, UserStateEnum, getTopLevelCategories, saveUserInterests, getUserInterests } from '@poupaia/db';
+import { escapeMarkdownV2, sendTelegramMessage, editTelegramMessage } from '@poupaia/messaging';
 import { Db } from 'mongodb';
 
-export const handleInterestsWorkflow = async (db: Db, chatId: number, user: User, messages: Message[]): Promise<void> => {
-  console.log(`[interestsWorkflow] Start chatId=${chatId} userId=${user.id} messages=${messages.length}`);
+const CATEGORIES_PER_PAGE = 5;
 
-  const categories = await getAllCategories(db);
-  const filteredCategories = [...new Set(categories.map(c => c.split(' > ')[0]))];
+interface CategoryState {
+  selectedCategories: string[];
+  page: number;
+  messageId?: number;
+}
 
-  const { type, interests } = await processUserMessage<InterestsResponse>(
-    interestsPrompt(filteredCategories),
-    messages.map(m => ({ role: m.type === 'user' ? 'user' : 'model', content: m.text }))
-  );
+// Armazenar temporariamente o estado de seleção por utilizador
+const userCategoryStates = new Map<number, CategoryState>();
 
-  console.log(`[interestsWorkflow] type=${type} interests=${JSON.stringify(interests)}`);
+export const handleInterestsCommand = async (db: Db, chatId: number, userId: number): Promise<void> => {
+  console.log(`[handleInterestsCommand] Start chatId=${chatId} userId=${userId}`);
 
-  switch (type) {
-    case InterestsIntentTypeEnum.SAVE_INTERESTS:
-      if (!interests || interests.length === 0) {
-        await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.MESSAGE_NOT_UNDERSTOOD)));
-        break;
-      }
+  // Obter categorias atuais do utilizador
+  const currentInterests = await getUserInterests(db, userId);
 
-      let updatedQueries = user.queries || [];
+  // Inicializar estado
+  userCategoryStates.set(userId, {
+    selectedCategories: currentInterests,
+    page: 0,
+  });
 
-      for (const interest of interests) {
-        const embeddingInput = interest.categories.length > 0
-          ? `${interest.query}, Category: ${interest.categories.join(', ')}`
-          : interest.query;
+  await showCategoriesPage(db, chatId, userId, 0);
+};
 
-        const embeddings = await generateEmbedding([embeddingInput]);
-        const values = embeddings[0]?.values ?? [];
+export const handleCategoryCallback = async (db: Db, chatId: number, userId: number, callbackData: string, messageId?: number): Promise<void> => {
+  console.log(`[handleCategoryCallback] chatId=${chatId} userId=${userId} data=${callbackData}`);
 
-        console.log(`[interestsWorkflow] Embedding generated for interest="${interest.query}" length=${values.length}`);
+  const state = userCategoryStates.get(userId) || { selectedCategories: [], page: 0 };
 
-        updatedQueries = mergeOrAppendQuery(updatedQueries, interest.query, values);
-      }
-
-      await updateUserState(db, user.id, { queries: updatedQueries });
-
-      const savedCount = interests.length;
-      await sendTelegramMessage(
-        chatId,
-        escapeMarkdownV2(`Guardei ${savedCount} interesse(s) teu(s)! Vou procurar produtos que combinam... 🔍`)
-      );
-
-      console.log(`[interestsWorkflow] Saved ${savedCount} interests for userId=${user.id}`);
-
-      // Fazer pesquisa automática baseada apenas nos interesses adicionados nesta operação
-      console.log(`[interestsWorkflow] Searching products based on newly added interests for userId=${user.id}`);
-      
-      try {
-        const allProducts: any[] = [];
-
-        for (const interest of interests) {
-          const embeddingInput = interest.categories.length > 0
-            ? `${interest.query}, Category: ${interest.categories.join(', ')}`
-            : interest.query;
-
-          const embeddings = await generateEmbedding([embeddingInput]);
-          const values = embeddings[0]?.values ?? [];
-
-          if (!values || values.length === 0) {
-            console.warn(`[interestsWorkflow] Skipping interest="${interest.query}" - no embeddings generated`);
-            continue;
-          }
-
-          const products = await searchProducts(db, { embeddings: values });
-          console.log(`[interestsWorkflow] Found ${products.length} products for interest="${interest.query}"`);
-          
-          allProducts.push(...products);
-        }
-
-        // Remover duplicados por ID
-        const uniqueProducts = Array.from(new Map(allProducts.map(p => [p.id, p])).values());
-        console.log(`[interestsWorkflow] Total unique products found: ${uniqueProducts.length}`);
-
-        if (uniqueProducts.length > 0) {
-          await sendProductsToUser(db, user.id, chatId, uniqueProducts);
-        } else {
-          await sendTelegramMessage(
-            chatId,
-            escapeMarkdownV2('Ainda não encontrei produtos que combinem com os teus interesses. Vou avisar-te assim que aparecerem! 🔔')
-          );
-        }
-      } catch (error) {
-        console.error('[interestsWorkflow] Error searching products:', error);
-        await sendTelegramMessage(
-          chatId,
-          escapeMarkdownV2('Guardei os teus interesses, mas tive um problema ao procurar produtos. Vou tentar novamente mais tarde!')
-        );
-      }
-
-      break;
-
-    default:
-      console.warn(`[interestsWorkflow] Unexpected type=${type}`);
-      await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.MESSAGE_NOT_UNDERSTOOD)));
-      break;
+  if (messageId) {
+    state.messageId = messageId;
+    userCategoryStates.set(userId, state);
   }
 
-  console.log('[interestsWorkflow] Done');
+  if (callbackData.startsWith('cat_')) {
+    // Toggle categoria
+    const category = callbackData.replace('cat_', '');
+    const index = state.selectedCategories.indexOf(category);
+    
+    if (index > -1) {
+      state.selectedCategories.splice(index, 1);
+    } else {
+      state.selectedCategories.push(category);
+    }
+
+    userCategoryStates.set(userId, state);
+    await showCategoriesPage(db, chatId, userId, state.page, true);
+
+  } else if (callbackData.startsWith('page_')) {
+    // Navegar para página
+    const page = parseInt(callbackData.replace('page_', ''), 10);
+    state.page = page;
+    userCategoryStates.set(userId, state);
+    await showCategoriesPage(db, chatId, userId, page, true);
+
+  } else if (callbackData === 'save_interests') {
+    // Guardar seleção
+    await saveUserInterests(db, userId, state.selectedCategories);
+    userCategoryStates.delete(userId);
+
+    await updateUserState(db, userId, { state: UserStateEnum.IDLE });
+
+    const count = state.selectedCategories.length;
+    await sendTelegramMessage(
+      chatId,
+      escapeMarkdownV2(`✅ Guardei ${count} categoria(s)! Vou enviar-te produtos dessas categorias quando o scraper encontrar novos produtos.`)
+    );
+
+  } else if (callbackData === 'cancel_interests') {
+    // Cancelar
+    userCategoryStates.delete(userId);
+    await updateUserState(db, userId, { state: UserStateEnum.IDLE });
+    await sendTelegramMessage(chatId, escapeMarkdownV2('❌ Seleção de categorias cancelada.'));
+  }
+};
+
+const showCategoriesPage = async (db: Db, chatId: number, userId: number, page: number, edit: boolean = false): Promise<void> => {
+  const allCategories = await getTopLevelCategories(db);
+  const state = userCategoryStates.get(userId) || { selectedCategories: [], page: 0 };
+
+  const totalPages = Math.ceil(allCategories.length / CATEGORIES_PER_PAGE);
+  const startIndex = page * CATEGORIES_PER_PAGE;
+  const endIndex = Math.min(startIndex + CATEGORIES_PER_PAGE, allCategories.length);
+  const categoriesOnPage = allCategories.slice(startIndex, endIndex);
+
+  // Criar botões para as categorias
+  const categoryButtons = categoriesOnPage.map(category => {
+    const isSelected = state.selectedCategories.includes(category);
+    return [
+      {
+        text: `${isSelected ? '✅' : '⬜'} ${category}`,
+        callback_data: `cat_${category}`,
+      },
+    ];
+  });
+
+  // Botões de navegação
+  const navigationButtons = [];
+  if (page > 0) {
+    navigationButtons.push({ text: '⬅️ Anterior', callback_data: `page_${page - 1}` });
+  }
+  if (page < totalPages - 1) {
+    navigationButtons.push({ text: '➡️ Próxima', callback_data: `page_${page + 1}` });
+  }
+
+  // Botões de ação
+  const actionButtons = [
+    { text: '💾 Guardar', callback_data: 'save_interests' },
+    { text: '❌ Cancelar', callback_data: 'cancel_interests' },
+  ];
+
+  const keyboard = [
+    ...categoryButtons,
+    ...(navigationButtons.length > 0 ? [navigationButtons] : []),
+    actionButtons,
+  ];
+
+  const selectedCount = state.selectedCategories.length;
+  const message = escapeMarkdownV2(
+    `Seleciona as categorias que te interessam:\n\n` +
+    `📄 Página ${page + 1} de ${totalPages}\n` +
+    `✅ Selecionadas: ${selectedCount}`
+  );
+
+  if (edit && state.messageId) {
+    await editTelegramMessage(chatId, state.messageId, message, keyboard as any);
+  } else {
+    const result = await sendTelegramMessage(chatId, message, keyboard as any);
+    if (result.result?.message_id) {
+      state.messageId = result.result.message_id;
+      userCategoryStates.set(userId, state);
+    }
+  }
 };

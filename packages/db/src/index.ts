@@ -4,6 +4,7 @@ export * from './product';
 export * from './messages';
 export * from './user';
 export * from './activities';
+export * from './interests';
 
 // Types
 export * from './models';
