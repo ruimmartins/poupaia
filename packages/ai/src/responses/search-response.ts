@@ -1,4 +1,4 @@
-import { QueryFilters } from '@poupaia/shared';
+import { QueryFilters } from '@poupaia/db';
 import { IdleIntentTypeEnum } from '../types';
 
 export interface SearchResponse {

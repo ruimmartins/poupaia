@@ -1,6 +1,6 @@
 import { Db, Collection } from 'mongodb';
 import { Product } from './models/products';
-import { QueryFilters } from '@poupaia/shared';
+import { QueryFilters } from './types/query-filters';
 import { brands } from './helpers/files/good-brands';
 
 export const getProductsCollection = async (db: Db): Promise<Collection<Product>> => db.collection<Product>('products');

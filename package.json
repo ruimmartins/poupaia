@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "build": "pnpm -r --filter=@poupaia/* run build",
-    "scraper": "ts-node apps/scraper/src/index.ts",
+    "scraper": "ts-node --project apps/scraper/tsconfig.json apps/scraper/src/index.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

@@ -8,5 +8,6 @@ export * from './interests';
 
 // Types
 export * from './models';
+export * from './types/query-filters';
 
 export * from './helpers/files/good-brands';

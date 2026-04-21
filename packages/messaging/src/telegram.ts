@@ -4,6 +4,22 @@ import { TelegramMessage } from './types/telegram-message';
 import { TelegramAction } from './types/telegram-action';
 import { TelegramOptions } from './types/telegram-options';
 
+export interface BotCommand {
+  command: string;
+  description: string;
+}
+
+export const setMyCommands = async (commands: BotCommand[]): Promise<void> => {
+  const response = await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setMyCommands`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ commands }),
+  });
+  const data = await response.json();
+  if (!data.ok) throw new Error(`Telegram API error: ${data.description}`);
+  console.log('[setMyCommands] Bot menu commands set successfully');
+};
+
 // Função de escape robusta para MarkdownV2
 export const escapeMarkdownV2 = (text: string | number): string => {
   return text.toString().replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');

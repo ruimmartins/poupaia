@@ -1,5 +1,5 @@
-import { handleCategoryCallback } from './workflows/interests';
-import { closeConnection, connectToDatabase, getOrCreateUser, UserStateEnum } from '@poupaia/db';
+import { handleCategoryCallback, handleInterestsCommand } from './workflows/interests';
+import { closeConnection, connectToDatabase, getOrCreateUser, updateUserState, UserStateEnum } from '@poupaia/db';
 
 export const handleCallbackQuery = async (callbackQuery: any): Promise<void> => {
   const userId = callbackQuery.from?.id;
@@ -19,8 +19,12 @@ export const handleCallbackQuery = async (callbackQuery: any): Promise<void> => 
     // Lidar com callbacks baseados no estado do utilizador
     if (user.state === UserStateEnum.SETTING_INTERESTS) {
       await handleCategoryCallback(db, chatId, userId, callbackData, messageId);
+    } else if (callbackData === 'save_interests') {
+      // Utilizador clicou no botão "Interesses" a partir do estado IDLE
+      await updateUserState(db, userId, { state: UserStateEnum.SETTING_INTERESTS });
+      await handleInterestsCommand(db, chatId, userId);
     } else {
-      console.warn(`[handleCallbackQuery] Callback received but user is not in SETTING_INTERESTS state`);
+      console.warn(`[handleCallbackQuery] Unhandled callback data="${callbackData}" for state=${user.state}`);
     }
 
     console.log('[handleCallbackQuery] Done');

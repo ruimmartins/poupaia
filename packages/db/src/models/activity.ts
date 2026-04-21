@@ -1,4 +1,4 @@
-import { QueryFilters } from '@poupaia/shared';
+import { QueryFilters } from '../types/query-filters';
 import { Message } from './message';
 import { Product } from './products';
 

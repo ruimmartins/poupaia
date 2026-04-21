@@ -22,6 +22,8 @@ export const handleRequest = async (message: any): Promise<void> => {
     if (message.text?.trim() === '/start') {
       console.log('[handleRequest] /start command received');
       await sendTelegramMessage(chatId, MESSAGES.START(message.from?.first_name));
+      await updateUserState(db, userId, { state: UserStateEnum.SETTING_INTERESTS });
+      await handleInterestsCommand(db, chatId, userId);
       return;
     }
 

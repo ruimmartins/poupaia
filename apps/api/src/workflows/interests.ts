@@ -1,4 +1,10 @@
-import { User, updateUserState, UserStateEnum, getTopLevelCategories, saveUserInterests, getUserInterests } from '@poupaia/db';
+import {
+  updateUserState,
+  UserStateEnum,
+  getTopLevelCategories,
+  saveUserInterests,
+  getUserInterests,
+} from '@poupaia/db';
 import { escapeMarkdownV2, sendTelegramMessage, editTelegramMessage } from '@poupaia/messaging';
 import { Db } from 'mongodb';
 

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { handleRequest } from './entry';
 import { handleCallbackQuery } from './callback-handler';
+import { setMyCommands } from '@poupaia/messaging';
 
 const app = express();
 app.use(express.json());
@@ -46,6 +47,15 @@ app.post('/', async (req, res) => {
 
 app.get('/health', (req, res) => res.status(200).send('OK'));
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`[server] Bot webhook server running on port ${PORT}`);
+
+  try {
+    await setMyCommands([
+      { command: 'start', description: 'Iniciar o bot' },
+      { command: 'interesses', description: 'Definir categorias de interesse' },
+    ]);
+  } catch (error) {
+    console.error('[server] Failed to set bot commands:', error);
+  }
 });

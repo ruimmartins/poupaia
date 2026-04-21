@@ -1,9 +1,9 @@
 import { idlePrompt, IdleIntentTypeEnum, processUserMessage, SearchResponse, generateEmbedding } from '@poupaia/ai';
-import { Message, searchProducts, getAllCategories, createOrUpdateActivity, setMessegesAsProcessed, User, updateUserState } from '@poupaia/db';
+import { Message, searchProducts, getAllCategories, createOrUpdateActivity, setMessegesAsProcessed, User, updateUserState, UserStateEnum } from '@poupaia/db';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
 import { sendProductsToUser, mergeOrAppendQuery } from '@poupaia/shared';
 import { Db } from 'mongodb';
-import { handleInterestsWorkflow } from './interests';
+import { handleInterestsCommand } from './interests';
 
 export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, messages: Message[]): Promise<void> => {
   console.log(`[idleWorkflow] Start chatId=${chatId} userId=${user.id} messages=${messages.length}`);
@@ -57,7 +57,8 @@ export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, mes
       break;
 
     case IdleIntentTypeEnum.SAVE_INTERESTS:
-      await handleInterestsWorkflow(db, chatId, user, messages);
+      await updateUserState(db, user.id, { state: UserStateEnum.SETTING_INTERESTS });
+      await handleInterestsCommand(db, chatId, user.id);
       break;
 
     case IdleIntentTypeEnum.IRRELEVANT:
