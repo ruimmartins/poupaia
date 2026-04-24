@@ -1,6 +1,7 @@
 import { Db } from 'mongodb';
 import { Product, saveMessage, updateUserState, UserStateEnum } from '@poupaia/db';
-import { sendTelegramMessage, sendTelegramPhoto, formatProductsForUser, getRandomMessage, MESSAGES, escapeMarkdownV2, QUESTIONS, TelegramAction } from '@poupaia/messaging';
+import { sendTelegramMessage, sendTelegramPhoto, sendTelegramPhotoBuffer, formatProductsForUser, getRandomMessage, MESSAGES, escapeMarkdownV2, QUESTIONS, TelegramAction } from '@poupaia/messaging';
+import { generateProductImage } from '@poupaia/image';
 import { isValidImageUrl } from './url-utils';
 
 const PRODUCTS_PER_PAGE = 10;
@@ -19,9 +20,23 @@ export const sendProductsToUser = async (
   await sendTelegramMessage(chatId, escapeMarkdownV2(getRandomMessage(MESSAGES.PRODUCTS_FOUND(sentProducts.length))));
 
   const productMessages = formatProductsForUser(sentProducts);
-  for (const message of productMessages) {
+  for (let i = 0; i < productMessages.length; i++) {
+    const message = productMessages[i];
+    const product = sentProducts[i];
+
     if (message.imageUrl && (await isValidImageUrl(message.imageUrl))) {
-      await sendTelegramPhoto(chatId, message.imageUrl, message.text);
+      try {
+        const imageBuffer = await generateProductImage({
+          imageUrl: message.imageUrl,
+          title: product.title,
+          originalPrice: product.originalPrice ?? product.currentPrice,
+          currentPrice: product.currentPrice,
+        });
+        await sendTelegramPhotoBuffer(chatId, imageBuffer, message.text);
+      } catch (error) {
+        console.error('[sendProductsToUser] Failed to generate product image, falling back to URL:', error);
+        await sendTelegramPhoto(chatId, message.imageUrl, message.text);
+      }
     } else {
       await sendTelegramMessage(chatId, message.text);
     }

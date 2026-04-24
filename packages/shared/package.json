@@ -21,6 +21,7 @@
   "dependencies": {
     "@poupaia/messaging": "workspace:*",
     "@poupaia/db": "workspace:*",
+    "@poupaia/image": "workspace:*",
     "mongodb": "^7.1.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"

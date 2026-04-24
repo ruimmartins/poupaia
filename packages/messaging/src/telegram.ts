@@ -110,6 +110,32 @@ export const sendTelegramPhoto = async (chat_id: string | number, photoUrl: stri
   }
 };
 
+export const sendTelegramPhotoBuffer = async (
+  chat_id: string | number,
+  photoBuffer: Buffer,
+  caption: string,
+  filename: string = 'product.jpg'
+): Promise<any> => {
+  try {
+    const formData = new FormData();
+    formData.append('chat_id', String(chat_id));
+    formData.append('caption', caption);
+    formData.append('parse_mode', 'MarkdownV2');
+    formData.append('photo', new Blob([new Uint8Array(photoBuffer)], { type: 'image/jpeg' }), filename);
+
+    const response = await fetch(
+      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendPhoto`,
+      { method: 'POST', body: formData }
+    );
+    const data = (await response.json()) as any;
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    if (!data.ok) throw new Error(`Telegram API error: ${data.description} with caption: ${caption}`);
+    return data;
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const formatProductsForUser = (products: Product[]): TelegramMessage[] => {
   const messages: TelegramMessage[] = [];
 

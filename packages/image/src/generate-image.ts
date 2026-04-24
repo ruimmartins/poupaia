@@ -1,92 +1,138 @@
 import sharp from 'sharp';
 import fetch from 'node-fetch';
-import fs from 'fs/promises';
+
+const CANVAS_SIZE = 1000;
+const BORDER_SIZE = 18;
+const BLUE_BORDER = '#1a6fd4';
+const BLUE_PRICE = '#1a6fd4';
+const BLUE_PRICE_BG = '#e8f1fb';
+const PRODUCT_IMG_SIZE = 500;
+const PRODUCT_IMG_TOP = 80;
 
 const calculateDiscount = (original: number, current: number): number => {
   return Math.round(((original - current) / original) * 100);
 };
 
-export const generateProductImage = async ({ imageUrl, title, originalPrice, currentPrice }: { imageUrl: string; title: string; originalPrice: number; currentPrice: number }) => {
-  const width = 1000;
-  const height = 1000;
+const formatPrice = (price: number): string => price.toFixed(2);
 
+export interface GenerateProductImageInput {
+  imageUrl: string;
+  title: string;
+  originalPrice: number;
+  currentPrice: number;
+}
+
+export const generateProductImage = async ({
+  imageUrl,
+  title,
+  originalPrice,
+  currentPrice,
+}: GenerateProductImageInput): Promise<Buffer> => {
+  const size = CANVAS_SIZE;
   const discount = calculateDiscount(originalPrice, currentPrice);
 
-  // 1️⃣ Buscar imagem produto
+  // 1. Fetch and resize product image (centered, contained, white bg)
   const response = await fetch(imageUrl);
   const productBuffer = Buffer.from(await response.arrayBuffer());
 
   const resizedProduct = await sharp(productBuffer)
-    .resize(800, 800, {
+    .resize(PRODUCT_IMG_SIZE, PRODUCT_IMG_SIZE, {
       fit: 'contain',
       background: '#ffffff',
     })
     .png()
     .toBuffer();
 
-  // 2️⃣ Carregar logo
-  const logoBuffer = await fs.readFile('./logo.png');
+  // 2. SVG overlay: blue border, price box, discount badge
+  const productLeft = Math.round((size - PRODUCT_IMG_SIZE) / 2);
 
-  const resizedLogo = await sharp(logoBuffer).resize(180).png().toBuffer();
+  // Price box dimensions
+  const priceBoxX = 60;
+  const priceBoxY = 720;
+  const priceBoxW = size - 120;
+  const priceBoxH = 210;
 
-  // 3️⃣ Criar SVG overlay
+  // Discount badge dimensions
+  const badgeW = 170;
+  const badgeH = 66;
+  const badgeX = size - priceBoxX - badgeW;
+  const badgeY = priceBoxY - badgeH / 2;
+
   const overlaySvg = `
-  <svg width="${width}" height="${height}">
-    
-    <!-- Badge desconto -->
-    <rect x="40" y="820" rx="20" ry="20"
-      width="200" height="100"
-      fill="#ff3b30"/>
-    <text x="140" y="885"
-      font-size="60"
-      fill="white"
-      font-family="Arial"
-      font-weight="bold"
-      text-anchor="middle">
-      -${discount}%
-    </text>
+<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
 
-    <!-- Caixa preço -->
-    <rect x="550" y="760" rx="30" ry="30"
-      width="400" height="180"
-      fill="#d6f0ff"/>
+  <!-- Blue border -->
+  <rect x="0" y="0" width="${size}" height="${size}"
+    fill="none"
+    stroke="${BLUE_BORDER}"
+    stroke-width="${BORDER_SIZE}"
+    rx="28" ry="28"/>
 
-    <!-- Preço original -->
-    <text x="750" y="815"
-      font-size="40"
-      fill="#555"
-      font-family="Arial"
-      text-anchor="middle"
-      text-decoration="line-through">
-      ${originalPrice.toFixed(2)}€
-    </text>
+  <!-- Price background box -->
+  <rect x="${priceBoxX}" y="${priceBoxY}" width="${priceBoxW}" height="${priceBoxH}"
+    rx="22" ry="22"
+    fill="${BLUE_PRICE_BG}"
+    stroke="${BLUE_BORDER}"
+    stroke-width="3"/>
 
-    <!-- Preço atual -->
-    <text x="750" y="900"
-      font-size="80"
-      fill="#0077cc"
-      font-family="Arial"
-      font-weight="bold"
-      text-anchor="middle">
-      ${currentPrice.toFixed(2)}€
-    </text>
+  <!-- Original price (struck-through, small, above) -->
+  <text
+    x="${priceBoxX + priceBoxW / 2}" y="${priceBoxY + 62}"
+    font-size="38"
+    fill="#888888"
+    font-family="Arial, sans-serif"
+    text-anchor="middle"
+    text-decoration="line-through">
+    ${formatPrice(originalPrice)}€
+  </text>
 
-  </svg>
-  `;
+  <!-- Current (promo) price (large, bold, blue) -->
+  <text
+    x="${priceBoxX + priceBoxW / 2}" y="${priceBoxY + 164}"
+    font-size="100"
+    fill="${BLUE_PRICE}"
+    font-family="Arial, sans-serif"
+    font-weight="bold"
+    text-anchor="middle">
+    ${formatPrice(currentPrice)}€
+  </text>
 
-  // 4️⃣ Criar imagem base branca
+  <!-- Discount badge -->
+  <rect x="${badgeX}" y="${badgeY}" width="${badgeW}" height="${badgeH}"
+    rx="14" ry="14"
+    fill="#e53e3e"/>
+  <text
+    x="${badgeX + badgeW / 2}" y="${badgeY + badgeH / 2 + 13}"
+    font-size="34"
+    fill="white"
+    font-family="Arial, sans-serif"
+    font-weight="bold"
+    text-anchor="middle">
+    -${discount}%
+  </text>
+
+</svg>`;
+
+  // 3. Composite: white canvas → product image (centered) → SVG overlay
   const finalImage = await sharp({
     create: {
-      width,
-      height,
-      channels: 3,
+      width: size,
+      height: size,
+      channels: 4,
       background: '#ffffff',
     },
   })
     .composite([
-      { input: resizedProduct, top: 120, left: 100 },
-      { input: resizedLogo, top: 40, left: 40 },
-      { input: Buffer.from(overlaySvg), top: 0, left: 0 },
+      {
+        input: resizedProduct,
+        top: PRODUCT_IMG_TOP,
+        left: productLeft,
+      },
+      {
+        input: Buffer.from(overlaySvg),
+        top: 0,
+        left: 0,
+      },
     ])
     .jpeg({ quality: 92 })
     .toBuffer();

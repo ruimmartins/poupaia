@@ -219,6 +219,9 @@ importers:
       '@poupaia/db':
         specifier: workspace:*
         version: link:../db
+      '@poupaia/image':
+        specifier: workspace:*
+        version: link:../image
       '@poupaia/messaging':
         specifier: workspace:*
         version: link:../messaging
