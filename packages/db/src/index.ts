@@ -11,3 +11,4 @@ export * from './models';
 export * from './types/query-filters';
 
 export * from './helpers/files/good-brands';
+export * from './helpers/files/categories';

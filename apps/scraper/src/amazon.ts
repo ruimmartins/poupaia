@@ -1,9 +1,59 @@
-import { Product, brands } from '@poupaia/db';
+import { Product, brands, getParentCategory } from '@poupaia/db';
 import { getBrowser, autoScroll, clickLikeHuman, randomTimeout, WAIT_FOR_NAVIGATION_TIMEOUT, WAIT_FOR_NETWORK_IDLE_TIMEOUT, WAIT_FOR_SELECTOR_TIMEOUT } from '@poupaia/scraper';
 
 const PROMOTIONS_REGEX = /\/api\/marketplaces\/.*\/promotions/;
 
-const parseProductData = (data: any, currentCategory: string): Product[] => {
+type DiscountLevel = 'fraco' | 'razoavel' | 'bom' | 'excelente';
+
+const getDiscountLevel = (currentPrice: number, originalPrice: number): DiscountLevel | null => {
+  if (originalPrice <= 0 || currentPrice >= originalPrice) return null;
+
+  const savings = originalPrice - currentPrice;
+  const discountPct = (savings / originalPrice) * 100;
+
+  if (currentPrice <= 10) {
+    if (discountPct >= 70) return 'excelente';
+    if (discountPct >= 50) return 'bom';
+    if (discountPct >= 30) return 'razoavel';
+    return 'fraco';
+  }
+
+  if (currentPrice <= 50) {
+    if (savings >= 20) return 'excelente';
+    if (savings >= 10) return 'bom';
+    if (savings >= 5) return 'razoavel';
+    return 'fraco';
+  }
+
+  if (currentPrice <= 200) {
+    if (savings >= 60) return 'excelente';
+    if (savings >= 30) return 'bom';
+    if (savings >= 15) return 'razoavel';
+    return 'fraco';
+  }
+
+  if (currentPrice <= 500) {
+    if (savings >= 150) return 'excelente';
+    if (savings >= 80) return 'bom';
+    if (savings >= 40) return 'razoavel';
+    return 'fraco';
+  }
+
+  if (currentPrice <= 1000) {
+    if (savings >= 300) return 'excelente';
+    if (savings >= 150) return 'bom';
+    if (savings >= 80) return 'razoavel';
+    return 'fraco';
+  }
+
+  // Acima de 1000€ — usar os mesmos critérios do tier premium
+  if (savings >= 300) return 'excelente';
+  if (savings >= 150) return 'bom';
+  if (savings >= 80) return 'razoavel';
+  return 'fraco';
+};
+
+const parseProductData = (data: any, currentCategory: string, amazonTopLevel: string): Product[] => {
   const result: Product[] = [];
 
   if (!data?.entity?.rankedPromotions || !Array.isArray(data.entity.rankedPromotions)) {
@@ -32,7 +82,8 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
 
       const discountPercentage = originalPrice && currentPrice && originalPrice > 0 ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0;
 
-      if (discountPercentage < 10) {
+      const discountLevel = getDiscountLevel(currentPrice, originalPrice || currentPrice);
+      if (!discountLevel || discountLevel === 'fraco') {
         continue;
       }
 
@@ -58,6 +109,7 @@ const parseProductData = (data: any, currentCategory: string): Product[] => {
         expiresAt: buyingOption.dealDetails?.entity?.endTime || null,
         discountPercentage,
         category: currentCategory,
+        parentCategory: getParentCategory(amazonTopLevel),
       });
     } catch (error: any) {
       console.warn('Error parsing product:', error.message);
@@ -129,7 +181,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
             }
 
             const data = await response.json();
-            const results = parseProductData(data, `${category} > ${subcategory}`);
+            const results = parseProductData(data, `${category} > ${subcategory}`, category);
             products.push(...results);
           } catch (error: any) {
             console.warn(`Failed to parse response from ${response.url()}:`, error.message);

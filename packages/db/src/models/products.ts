@@ -12,7 +12,8 @@ export interface Product {
   // --- Assets & Links ---
   url: string; // Clean URL (no tracking params)
   imageUrl: string;
-  category: string; // Scraped category or department
+  category: string; // Scraped category or department (e.g. "Eletrónica > Auriculares")
+  parentCategory: string | null; // Mapped top-level parent category (e.g. "Eletrónica & Tecnologia")
 
   // --- Timestamps ---
   createdAt: string; // When first seen

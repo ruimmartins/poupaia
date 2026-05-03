@@ -1,5 +1,5 @@
 import { Db } from 'mongodb';
-import { getAllCategories } from './product';
+import { PARENT_CATEGORIES } from './helpers/files/categories';
 import { getUsersCollection } from './user';
 
 export interface CategorySelection {
@@ -10,18 +10,12 @@ export interface CategorySelection {
 
 export const CATEGORIES_PER_PAGE = 5;
 
-export const getTopLevelCategories = async (db: Db): Promise<string[]> => {
-  const allCategories = await getAllCategories(db);
-  
-  // Extrair apenas a categoria de nível superior (antes do primeiro " > ")
-  const topLevel = allCategories
-    .map(category => {
-      const parts = category.split(' > ');
-      return parts[0].trim();
-    })
-    .filter((category, index, self) => self.indexOf(category) === index); // remover duplicados
-  
-  return topLevel.sort();
+/**
+ * Returns the fixed list of parent category names available for user interests.
+ * These are derived from the PARENT_CATEGORIES mapping, not from DB state.
+ */
+export const getTopLevelCategories = async (_db: Db): Promise<string[]> => {
+  return PARENT_CATEGORIES.map(c => c.nome);
 };
 
 export const saveUserInterests = async (db: Db, userId: number, interests: string[]): Promise<void> => {
