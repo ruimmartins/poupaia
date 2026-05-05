@@ -169,7 +169,7 @@ export const formatProductsForUser = (products: Product[]): TelegramMessage[] =>
     }
 
     // A URL do link não deve ser escapada pela função global, apenas caracteres que quebrem o MD (raro em URLs Amazon)
-    message += `\n🛒 [Compra aqui](${product.url}?tag=ruimmartins-20)\n\n`;
+    message += `\n🛒 [Compra aqui](${product.url}?tag=ruimmartins-21)\n\n`;
 
     messages.push({
       text: message,
