@@ -20,6 +20,9 @@ export interface Product {
   updatedAt: string; // Last time price was checked
   expiresAt: string | null; // Especially for Lightning Deals (Ofertas Flash)
 
+  // --- Sent tracking ---
+  sentToUserIds?: number[]; // Array of user IDs that have received this product via the scraper
+
   embedding?: number[]; // Gemini embedding vector (length depends on model, e.g., 768 or 1024)
 
   // --- AI Analysis (Gemini Output) ---

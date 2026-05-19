@@ -90,28 +90,25 @@ const main = async () => {
 
         console.log(`[notifyUsers] Found ${users.length} users`);
 
+        const productsCollection = await getProductsCollection(ctx.db);
+
         for (const user of users) {
           if (!user.chatId) {
             console.log(`[notifyUsers] User ${user.id} has no chatId, skipping`);
             continue;
           }
 
-          // Verificar se o utilizador tem categorias de interesse definidas
           if (!user.interests || user.interests.length === 0) {
             console.log(`[notifyUsers] User ${user.id} has no interests, skipping`);
             continue;
           }
 
-          // Procurar produtos das categorias de interesse criados na última hora
           const minCreatedAt = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
-          
-          const productsCollection = await getProductsCollection(ctx.db);
-          
-          // Criar query para encontrar produtos cuja categoria pai corresponde às categorias de interesse
+
           const categoryQueries = user.interests.map(interest => ({
             parentCategory: interest,
           }));
-          
+
           const foundProducts = await productsCollection
             .find({
               createdAt: { $gte: minCreatedAt },
@@ -120,13 +117,25 @@ const main = async () => {
             .sort({ discountPercentage: -1 })
             .toArray();
 
-          console.log(`[notifyUsers] User ${user.id} found ${foundProducts.length} products from interests`);
+          // Filter out products already sent to this user
+          const productsToSend = foundProducts.filter(
+            product => !product.sentToUserIds || !product.sentToUserIds.includes(user.id)
+          );
 
-          if (foundProducts.length > 0) {
-            // Enviar todos os produtos encontrados (sem limite de 10)
-            await sendProductsToUser(ctx.db, user.id, user.chatId, foundProducts, true);
-            totalSentProducts += foundProducts.length;
-            console.log(`[notifyUsers] User ${user.id} sent ${foundProducts.length} products`);
+          console.log(`[notifyUsers] User ${user.id} found ${foundProducts.length} products, ${productsToSend.length} unsent`);
+
+          if (productsToSend.length > 0) {
+            await sendProductsToUser(ctx.db, user.id, user.chatId, productsToSend, true);
+
+            // Update products to track that this user received them
+            const productIds = productsToSend.map(p => p.id);
+            await productsCollection.updateMany(
+              { id: { $in: productIds } },
+              { $addToSet: { sentToUserIds: user.id } }
+            );
+
+            totalSentProducts += productsToSend.length;
+            console.log(`[notifyUsers] User ${user.id} sent ${productsToSend.length} products`);
           } else {
             console.log(`[notifyUsers] User ${user.id} no products to send`);
           }
