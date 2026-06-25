@@ -103,15 +103,12 @@ const main = async () => {
             continue;
           }
 
-          const minCreatedAt = new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString();
-
           const categoryQueries = user.interests.map(interest => ({
             parentCategory: interest,
           }));
 
           const foundProducts = await productsCollection
             .find({
-              createdAt: { $gte: minCreatedAt },
               $or: categoryQueries,
             })
             .sort({ discountPercentage: -1 })

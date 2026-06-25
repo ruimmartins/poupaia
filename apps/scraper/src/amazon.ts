@@ -2,6 +2,7 @@ import { Product, brands, getParentCategory } from '@poupaia/db';
 import { getBrowser, autoScroll, clickLikeHuman, randomTimeout, WAIT_FOR_NAVIGATION_TIMEOUT, WAIT_FOR_NETWORK_IDLE_TIMEOUT, WAIT_FOR_SELECTOR_TIMEOUT } from '@poupaia/scraper';
 
 const PROMOTIONS_REGEX = /\/api\/marketplaces\/.*\/promotions/;
+const CATEGORY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos por categoria
 
 type DiscountLevel = 'fraco' | 'razoavel' | 'bom' | 'excelente';
 
@@ -156,7 +157,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
     await clickLikeHuman(seeMoreBrandsButton);
     await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
 
-    const mainDepartmentsLocator = departmentsContainer.locator('div:first-child [role="radiogroup"] [data-testid^="filter-departments-"]');
+    const mainDepartmentsLocator = departmentsContainer.locator('[role="radiogroup"]').first().locator('[data-testid^="filter-departments-"]');
     await mainDepartmentsLocator.first().waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
     const allMainDepartments = (await mainDepartmentsLocator.all()).slice(0, -1);
 
@@ -197,73 +198,80 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
       let responseListener: ((response: any) => Promise<void>) | null = null;
 
       try {
-        const filter = mainDepartments[i];
-        const categoryName = await filter.innerText();
-        await clickLikeHuman(filter);
-        await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
-        await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
-
-        const subDepartmentsLocator = departmentsContainer.locator('div:nth-child(2) [role="radiogroup"] [data-testid^="filter-departments-"]');
-        await subDepartmentsLocator.first().waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
-        const subDepartments = await subDepartmentsLocator.all();
-
-        for (const subFilter of subDepartments.slice(1)) {
-          const subcategoryName = await subFilter.innerText();
-
-          responseListener = createResponseListener(categoryName, subcategoryName);
-          page.on('response', responseListener);
-
-          await clickLikeHuman(subFilter);
-          await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
-          await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
-          await autoScroll(page, 10, 500);
-          await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
-          await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
-
-          let checkboxesClicked = [];
-          const brandsCheckbox = await departmentsContainer.locator('div[data-csa-c-element-id^="filter-brands"]').all();
-
-          for (const checkbox of brandsCheckbox) {
-            const value = await checkbox.getAttribute('data-csa-c-element-id');
-            if (value && brands.includes(value.replace('filter-brands-', ''))) {
-              checkboxesClicked.push(checkbox);
-              await clickLikeHuman(checkbox);
-              await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
-              await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
-            }
-          }
-
-          if (checkboxesClicked.length > 0) {
-            await autoScroll(page, 10, 500);
+        await Promise.race([
+          (async () => {
+            const filter = mainDepartments[i];
+            const categoryName = await filter.innerText();
+            await clickLikeHuman(filter);
             await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
             await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
-            for (const checkbox of checkboxesClicked) {
-              await clickLikeHuman(checkbox);
-              await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+
+            const subDepartmentsLocator = departmentsContainer.locator('[role="radiogroup"]').nth(1).locator('[data-testid^="filter-departments-"]');
+            await subDepartmentsLocator.first().waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
+            const subDepartments = await subDepartmentsLocator.all();
+
+            for (const subFilter of subDepartments.slice(1)) {
+              const subcategoryName = await subFilter.innerText();
+
+              responseListener = createResponseListener(categoryName, subcategoryName);
+              page.on('response', responseListener);
+
+              try {
+                await clickLikeHuman(subFilter);
+                await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+                await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+                await autoScroll(page, 10, 500);
+                await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+                await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+
+                let checkboxesClicked: any[] = [];
+                const brandsCheckbox = await departmentsContainer.locator('div[data-csa-c-element-id^="filter-brands"]').all();
+
+                for (const checkbox of brandsCheckbox) {
+                  const value = await checkbox.getAttribute('data-csa-c-element-id');
+                  if (value && brands.some(b => b.toLowerCase() === value.replace('filter-brands-', '').toLowerCase())) {
+                    checkboxesClicked.push(checkbox);
+                    await clickLikeHuman(checkbox);
+                    await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+                    await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+                  }
+                }
+
+                if (checkboxesClicked.length > 0) {
+                  await autoScroll(page, 10, 500);
+                  await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+                  await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+                  for (const checkbox of checkboxesClicked) {
+                    await clickLikeHuman(checkbox);
+                    await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+                    await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+                  }
+                }
+              } finally {
+                page.off('response', responseListener);
+                responseListener = null;
+              }
+
+              const categoryButton = departmentsContainer.getByRole('button', { name: categoryName, exact: true }).first();
+              await categoryButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
+              await clickLikeHuman(categoryButton);
               await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
             }
-          }
 
-          page.off('response', responseListener);
-          responseListener = null;
-
-          const categoryButton = departmentsContainer.getByRole('button', { name: categoryName, exact: true }).first();
-          await categoryButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
-          await clickLikeHuman(categoryButton);
-          await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
-        }
-
-        try {
-          const breadcrumbButton = departmentsContainer.getByTestId('breadcrumb').getByRole('button').first();
-          await breadcrumbButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
-          await clickLikeHuman(breadcrumbButton);
-          await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
-        } catch (e) {
-          const allDepartmentsButton = page.locator('[data-testid="filter-departments-all"]');
-          await allDepartmentsButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
-          await clickLikeHuman(allDepartmentsButton);
-          await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
-        }
+            try {
+              const breadcrumbButton = departmentsContainer.getByTestId('breadcrumb').getByRole('button').first();
+              await breadcrumbButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
+              await clickLikeHuman(breadcrumbButton);
+              await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+            } catch (e) {
+              const allDepartmentsButton = page.locator('[data-testid="filter-departments-all"]');
+              await allDepartmentsButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
+              await clickLikeHuman(allDepartmentsButton);
+              await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+            }
+          })(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error(`Category timeout after ${CATEGORY_TIMEOUT_MS / 1000}s`)), CATEGORY_TIMEOUT_MS)),
+        ]);
       } catch (error: any) {
         console.error(`[Task ${taskIndex}] Error on category index ${i}, reloading page and skipping to next category:`, error.message);
 
@@ -274,6 +282,8 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
 
         try {
           ({ departmentsContainer, mainDepartments } = await setupFilters());
+          i = -1; // reset counter — for-loop i++ will make it 0, restarting from the reloaded list
+          continue;
         } catch (setupError: any) {
           console.error(`[Task ${taskIndex}] Failed to reload page after category error:`, setupError.message);
           break;

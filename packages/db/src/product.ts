@@ -13,13 +13,13 @@ export const createOrUpdateProducts = async (db: Db, products: Product[]) => {
   const bulkOps = products
     .filter(product => brands.includes(product.brand ?? 'not a brand'))
     .map(product => {
-      const { createdAt, ...productWithoutCreatedAt } = product;
+      const { createdAt, sentToUserIds, ...productWithoutMeta } = product;
 
       return {
         updateOne: {
           filter: { id: product.id },
           update: {
-            $set: productWithoutCreatedAt,
+            $set: productWithoutMeta,
             $setOnInsert: { createdAt },
           },
           upsert: true,
