@@ -18,9 +18,6 @@
     "apps/*",
     "packages/*"
   ],
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "protobufjs", "sharp"]
-  },
   "devDependencies": {
     "@types/node": "^25.2.3",
     "ts-node": "^10.9.2",
