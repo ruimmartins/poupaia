@@ -58,11 +58,9 @@ export const handleNotifPrefsCallback = async (db: Db, chatId: number, userId: n
     await updateUserState(db, userId, { state: UserStateEnum.IDLE });
     await sendTelegramMessage(
       chatId,
-      escapeMarkdownV2(
-        `✅ Preferências guardadas\\!\n\n` +
-        `• Nível mínimo: *${state.minDiscountLevel}*\n` +
-        `• Máximo por categoria: *${state.maxResultsPerCategory === 0 ? 'Sem limite' : state.maxResultsPerCategory}*`
-      )
+      `✅ Preferências guardadas\\!\n\n` +
+        `• Nível mínimo: *${escapeMarkdownV2(state.minDiscountLevel)}*\n` +
+        `• Máximo por categoria: *${escapeMarkdownV2(state.maxResultsPerCategory === 0 ? 'Sem limite' : state.maxResultsPerCategory)}*`
     );
   } else if (callbackData === 'cancel_notif_prefs') {
     userNotifPrefsStates.delete(userId);
@@ -94,11 +92,10 @@ const showNotifPrefsPage = async (db: Db, chatId: number, userId: number, edit: 
 
   const resultsLabel = state.maxResultsPerCategory === 0 ? 'Sem limite' : `${state.maxResultsPerCategory}`;
 
-  const message = escapeMarkdownV2(
+  const message =
     `⚙️ *Preferências de notificação*\n\n` +
-    `*Nível mínimo:* ${state.minDiscountLevel}\n` +
-    `*Máx\\. por categoria:* ${resultsLabel}`
-  );
+    `*Nível mínimo:* ${escapeMarkdownV2(state.minDiscountLevel)}\n` +
+    `*Máx\\. por categoria:* ${escapeMarkdownV2(resultsLabel)}`;
 
   if (edit && state.messageId) {
     await editTelegramMessage(chatId, state.messageId, message, keyboard as any);
