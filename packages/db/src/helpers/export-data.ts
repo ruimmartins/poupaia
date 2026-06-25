@@ -3,7 +3,7 @@
 import * as dotenv from 'dotenv';
 import path from 'path';
 import { existsSync } from 'fs';
-import { connectToDatabase, closeConnection, getProductsCollection, getAlertsCollection, getMessagesCollection, getUsersCollection } from '../index';
+import { connectToDatabase, closeConnection, getProductsCollection } from '../index';
 
 // Carregar .env (procura na raiz do projeto)
 const envPath = path.resolve(__dirname, '../../../../.env');

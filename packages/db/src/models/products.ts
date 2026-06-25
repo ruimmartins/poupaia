@@ -8,6 +8,7 @@ export interface Product {
   originalPrice: number | null; // For discount calculation
   brand: string | null; // Optional brand name
   discountPercentage: number; // Calculated: ((original - current) / original) * 100
+  discountLevel?: 'razoavel' | 'bom' | 'excelente';
 
   // --- Assets & Links ---
   url: string; // Clean URL (no tracking params)

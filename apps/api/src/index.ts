@@ -54,6 +54,7 @@ app.listen(PORT, async () => {
     await setMyCommands([
       { command: 'start', description: 'Iniciar o bot' },
       { command: 'interesses', description: 'Definir categorias de interesse' },
+      { command: 'preferencias', description: 'Configurar notificações' },
     ]);
   } catch (error) {
     console.error('[server] Failed to set bot commands:', error);

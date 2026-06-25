@@ -123,6 +123,11 @@ const createIndexes = async () => {
     await collection.createIndex({ expiresAt: 1, createdAt: -1 }, { name: 'idx_expiresAt_createdAt' });
     console.log('✓ Compound index created');
 
+    // 8b. Index para discountLevel (usado nos filtros de notificação)
+    console.log('Creating discountLevel index...');
+    await collection.createIndex({ discountLevel: 1 }, { name: 'idx_discountLevel' });
+    console.log('✓ DiscountLevel index created');
+
     // 9. Vector Search index (MongoDB Atlas Search)
     console.log('Creating vector search index...');
     const vectorDimensionsRaw = process.env.MONGODB_VECTOR_DIMENSIONS;

@@ -1,4 +1,5 @@
 import { handleCategoryCallback, handleInterestsCommand } from './workflows/interests';
+import { handleNotifPrefsCallback, handleNotifPrefsCommand } from './workflows/notif-prefs';
 import { closeConnection, connectToDatabase, getOrCreateUser, updateUserState, UserStateEnum } from '@poupaia/db';
 
 export const handleCallbackQuery = async (callbackQuery: any): Promise<void> => {
@@ -19,10 +20,16 @@ export const handleCallbackQuery = async (callbackQuery: any): Promise<void> => 
     // Lidar com callbacks baseados no estado do utilizador
     if (user.state === UserStateEnum.SETTING_INTERESTS) {
       await handleCategoryCallback(db, chatId, userId, callbackData, messageId);
+    } else if (user.state === UserStateEnum.SETTING_NOTIF_PREFS) {
+      await handleNotifPrefsCallback(db, chatId, userId, callbackData, messageId);
     } else if (callbackData === 'save_interests') {
       // Utilizador clicou no botão "Interesses" a partir do estado IDLE
       await updateUserState(db, userId, { state: UserStateEnum.SETTING_INTERESTS });
       await handleInterestsCommand(db, chatId, userId);
+    } else if (callbackData === 'save_notif_prefs') {
+      // Utilizador clicou no botão "Preferências" a partir do estado IDLE
+      await updateUserState(db, userId, { state: UserStateEnum.SETTING_NOTIF_PREFS });
+      await handleNotifPrefsCommand(db, chatId, userId);
     } else {
       console.warn(`[handleCallbackQuery] Unhandled callback data="${callbackData}" for state=${user.state}`);
     }

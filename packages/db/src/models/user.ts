@@ -9,11 +9,17 @@ export enum UserStateEnum {
   IDLE = 'idle',
   BROWSING = 'browsing',
   SETTING_INTERESTS = 'setting_interests',
+  SETTING_NOTIF_PREFS = 'setting_notif_prefs',
 }
 
 export interface UserQueries {
   query: string;
   embeddings?: number[];
+}
+
+export interface NotificationPrefs {
+  minDiscountLevel: 'razoavel' | 'bom' | 'excelente';
+  maxResultsPerCategory: number;
 }
 
 export interface User {
@@ -23,5 +29,6 @@ export interface User {
   profile: Profile;
   queries?: UserQueries[];
   interests?: string[];
+  notificationPrefs?: NotificationPrefs;
   chatId: number;
 }

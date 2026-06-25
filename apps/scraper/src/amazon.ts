@@ -12,6 +12,9 @@ const getDiscountLevel = (currentPrice: number, originalPrice: number): Discount
   const savings = originalPrice - currentPrice;
   const discountPct = (savings / originalPrice) * 100;
 
+  // Floor absoluto: nunca considerar deals abaixo de 5%
+  if (discountPct < 5) return 'fraco';
+
   if (currentPrice <= 10) {
     if (discountPct >= 70) return 'excelente';
     if (discountPct >= 50) return 'bom';
@@ -20,37 +23,29 @@ const getDiscountLevel = (currentPrice: number, originalPrice: number): Discount
   }
 
   if (currentPrice <= 50) {
-    if (savings >= 20) return 'excelente';
-    if (savings >= 10) return 'bom';
-    if (savings >= 5) return 'razoavel';
+    if (discountPct >= 50 || savings >= 20) return 'excelente';
+    if (discountPct >= 35 || savings >= 10) return 'bom';
+    if (discountPct >= 20 || savings >= 5) return 'razoavel';
     return 'fraco';
   }
 
   if (currentPrice <= 200) {
-    if (savings >= 60) return 'excelente';
-    if (savings >= 30) return 'bom';
-    if (savings >= 15) return 'razoavel';
+    if (discountPct >= 40 || savings >= 60) return 'excelente';
+    if (discountPct >= 30 || savings >= 30) return 'bom';
+    if (discountPct >= 15 || savings >= 15) return 'razoavel';
     return 'fraco';
   }
 
   if (currentPrice <= 500) {
-    if (savings >= 150) return 'excelente';
-    if (savings >= 80) return 'bom';
-    if (savings >= 40) return 'razoavel';
+    if (discountPct >= 40 || savings >= 150) return 'excelente';
+    if (discountPct >= 30 || savings >= 80) return 'bom';
+    if (discountPct >= 15 || savings >= 40) return 'razoavel';
     return 'fraco';
   }
 
-  if (currentPrice <= 1000) {
-    if (savings >= 300) return 'excelente';
-    if (savings >= 150) return 'bom';
-    if (savings >= 80) return 'razoavel';
-    return 'fraco';
-  }
-
-  // Acima de 1000€ — usar os mesmos critérios do tier premium
-  if (savings >= 300) return 'excelente';
-  if (savings >= 150) return 'bom';
-  if (savings >= 80) return 'razoavel';
+  if (discountPct >= 35 || savings >= 300) return 'excelente';
+  if (discountPct >= 25 || savings >= 150) return 'bom';
+  if (discountPct >= 10 || savings >= 80) return 'razoavel';
   return 'fraco';
 };
 
@@ -109,6 +104,7 @@ const parseProductData = (data: any, currentCategory: string, amazonTopLevel: st
         url: `https://www.amazon.es/-/pt/dp/${asin}`,
         expiresAt: buyingOption.dealDetails?.entity?.endTime || null,
         discountPercentage,
+        discountLevel,
         category: currentCategory,
         parentCategory: getParentCategory(amazonTopLevel),
       });

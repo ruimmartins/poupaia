@@ -103,16 +103,41 @@ const main = async () => {
             continue;
           }
 
-          const categoryQueries = user.interests.map(interest => ({
-            parentCategory: interest,
-          }));
+          const prefs = user.notificationPrefs ?? { minDiscountLevel: 'razoavel', maxResultsPerCategory: 0 };
+          const maxResultsPerCat = prefs.maxResultsPerCategory > 0 ? prefs.maxResultsPerCategory : 0;
 
-          const foundProducts = await productsCollection
-            .find({
-              $or: categoryQueries,
-            })
-            .sort({ discountPercentage: -1 })
-            .toArray();
+          const DISCOUNT_LEVELS = ['razoavel', 'bom', 'excelente'] as const;
+          const minLevelIdx = DISCOUNT_LEVELS.indexOf(prefs.minDiscountLevel);
+          const allowedLevels = DISCOUNT_LEVELS.slice(minLevelIdx);
+
+          const baseQuery: any = {
+            discountLevel: { $in: allowedLevels },
+          };
+
+          let foundProducts;
+
+          if (maxResultsPerCat > 0) {
+            // Query per-category with individual limits
+            const perCategoryResults = await Promise.all(
+              user.interests.map(interest =>
+                productsCollection
+                  .find({ ...baseQuery, parentCategory: interest })
+                  .sort({ discountPercentage: -1 })
+                  .limit(maxResultsPerCat)
+                  .toArray()
+              )
+            );
+            foundProducts = perCategoryResults.flat();
+          } else {
+            const categoryQueries = user.interests.map(interest => ({
+              parentCategory: interest,
+            }));
+
+            foundProducts = await productsCollection
+              .find({ ...baseQuery, $or: categoryQueries })
+              .sort({ discountPercentage: -1 })
+              .toArray();
+          }
 
           // Filter out products already sent to this user
           const productsToSend = foundProducts.filter(

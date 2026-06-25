@@ -1,4 +1,5 @@
 import { handleInterestsCommand } from './workflows/interests';
+import { handleNotifPrefsCommand } from './workflows/notif-prefs';
 import { closeConnection, connectToDatabase, getOrCreateUser, updateUserState, UserStateEnum } from '@poupaia/db';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
 
@@ -26,6 +27,13 @@ export const handleRequest = async (message: any): Promise<void> => {
       console.log('[handleRequest] /interesses command received');
       await updateUserState(db, userId, { state: UserStateEnum.SETTING_INTERESTS });
       await handleInterestsCommand(db, chatId, userId);
+      return;
+    }
+
+    if (message.text?.trim() === '/preferencias') {
+      console.log('[handleRequest] /preferencias command received');
+      await updateUserState(db, userId, { state: UserStateEnum.SETTING_NOTIF_PREFS });
+      await handleNotifPrefsCommand(db, chatId, userId);
       return;
     }
 
