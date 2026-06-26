@@ -202,7 +202,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
             await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
             await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
 
-            const subDepartmentsLocator = departmentsContainer.locator('[role="radiogroup"]').nth(1).locator('[data-testid^="filter-departments-"]');
+            const subDepartmentsLocator = departmentsContainer.locator('[role="radiogroup"]').first().locator('[data-testid^="filter-departments-"]');
             await subDepartmentsLocator.first().waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
             const subDepartments = await subDepartmentsLocator.all();
 
@@ -278,7 +278,8 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
 
         try {
           ({ departmentsContainer, mainDepartments } = await setupFilters());
-          i = -1; // reset counter — for-loop i++ will make it 0, restarting from the reloaded list
+          // Don't reset i: for-loop's i++ will move to the next category
+          if (i >= mainDepartments.length) break;
           continue;
         } catch (setupError: any) {
           console.error(`[Task ${taskIndex}] Failed to reload page after category error:`, setupError.message);
