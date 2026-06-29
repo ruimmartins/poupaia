@@ -19,7 +19,7 @@ const main = async () => {
   const tasks = new Listr([
     {
       title: 'Wating...',
-      skip: process.env.NO_SCRAPING === 'true', // Pular em produção
+      skip: process.env.NO_SCRAPING === 'true' || process.env.SKIP_WAIT === 'true',
       task: async (ctx, task) => {
         const oneHour = 1000 * 60 * 60;
         const delay = Math.floor(Math.random() * oneHour); // Delay aleatório entre 0h e 1h

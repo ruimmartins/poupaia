@@ -1,8 +1,20 @@
 import { Product, brands, getParentCategory } from '@poupaia/db';
-import { getBrowser, autoScroll, clickLikeHuman, randomTimeout, WAIT_FOR_NAVIGATION_TIMEOUT, WAIT_FOR_NETWORK_IDLE_TIMEOUT, WAIT_FOR_SELECTOR_TIMEOUT } from '@poupaia/scraper';
+import { getBrowser, autoScroll, clickLikeHuman, randomTimeout, WAIT_FOR_NAVIGATION_TIMEOUT, WAIT_FOR_SELECTOR_TIMEOUT } from '@poupaia/scraper';
 
 const PROMOTIONS_REGEX = /\/api\/marketplaces\/.*\/promotions/;
-const CATEGORY_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos por categoria
+const CATEGORY_TIMEOUT_MS = 10 * 60 * 1000;
+const WAIT_FOR_PROMOTIONS_TIMEOUT = 15000;
+
+const waitForAmazonContent = async (page: any) => {
+  try {
+    await page.waitForResponse(
+      (response: any) => PROMOTIONS_REGEX.test(response.url()) && response.status() === 200,
+      { timeout: WAIT_FOR_PROMOTIONS_TIMEOUT }
+    );
+  } catch {
+    await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+  }
+};
 
 type DiscountLevel = 'fraco' | 'razoavel' | 'bom' | 'excelente';
 
@@ -118,11 +130,43 @@ const parseProductData = (data: any, currentCategory: string, amazonTopLevel: st
 };
 
 export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1) => {
-  const { page, browser } = await getBrowser();
+  let { page, browser } = await getBrowser();
 
   const products: Product[] = [];
 
+  let pageClosed = false;
+  page.on('close', () => {
+    pageClosed = true;
+    console.log(`[Task ${taskIndex}] Page closed unexpectedly`);
+  });
+  page.on('crash', () => {
+    pageClosed = true;
+    console.log(`[Task ${taskIndex}] Page crashed`);
+  });
+
+  const recreateBrowser = async () => {
+    try {
+      await browser.close();
+    } catch {}
+    const newBrowser = await getBrowser();
+    browser = newBrowser.browser;
+    page = newBrowser.page;
+    pageClosed = false;
+    page.on('close', () => {
+      pageClosed = true;
+      console.log(`[Task ${taskIndex}] Page closed unexpectedly`);
+    });
+    page.on('crash', () => {
+      pageClosed = true;
+      console.log(`[Task ${taskIndex}] Page crashed`);
+    });
+  };
+
   const setupFilters = async () => {
+    if (pageClosed) {
+      console.log(`[Task ${taskIndex}] Page/browser is closed, recreating...`);
+      await recreateBrowser();
+    }
     await page.goto('https://www.amazon.es/deals?language=pt_PT', {
       waitUntil: 'domcontentloaded',
       timeout: 60000,
@@ -190,6 +234,12 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
     // Dividir categorias entre tasks
     let { departmentsContainer, mainDepartments } = await setupFilters();
 
+    const maxCategories = parseInt(process.env.MAX_CATEGORIES || '', 10) || 0;
+    if (maxCategories > 0 && mainDepartments.length > maxCategories) {
+      console.log(`[Task ${taskIndex}] MAX_CATEGORIES=${maxCategories}: limiting from ${mainDepartments.length} to ${maxCategories} categories`);
+      mainDepartments = mainDepartments.slice(0, maxCategories);
+    }
+
     for (let i = 0; i < mainDepartments.length; i++) {
       let responseListener: ((response: any) => Promise<void>) | null = null;
 
@@ -198,26 +248,31 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
           (async () => {
             const filter = mainDepartments[i];
             const categoryName = await filter.innerText();
+            console.log(`[Task ${taskIndex}] Category ${i + 1}/${mainDepartments.length}: ${categoryName}`);
             await clickLikeHuman(filter);
-            await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+            await waitForAmazonContent(page);
             await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
 
             const subDepartmentsLocator = departmentsContainer.locator('[role="radiogroup"]').first().locator('[data-testid^="filter-departments-"]');
             await subDepartmentsLocator.first().waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
             const subDepartments = await subDepartmentsLocator.all();
+            const subDeptsToProcess = subDepartments.slice(1);
+            console.log(`[Task ${taskIndex}]   Subcategories: ${subDeptsToProcess.length}`);
 
-            for (const subFilter of subDepartments.slice(1)) {
+            for (let sIdx = 0; sIdx < subDeptsToProcess.length; sIdx++) {
+              const subFilter = subDeptsToProcess[sIdx];
               const subcategoryName = await subFilter.innerText();
+              console.log(`[Task ${taskIndex}]   Sub ${sIdx + 1}/${subDeptsToProcess.length}: ${subcategoryName}`);
 
               responseListener = createResponseListener(categoryName, subcategoryName);
               page.on('response', responseListener);
 
               try {
                 await clickLikeHuman(subFilter);
-                await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+                await waitForAmazonContent(page);
                 await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
                 await autoScroll(page, 10, 500);
-                await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+                await waitForAmazonContent(page);
                 await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
 
                 let checkboxesClicked: any[] = [];
@@ -226,20 +281,21 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
                 for (const checkbox of brandsCheckbox) {
                   const value = await checkbox.getAttribute('data-csa-c-element-id');
                   if (value && brands.some(b => b.toLowerCase() === value.replace('filter-brands-', '').toLowerCase())) {
+                    console.log(`[Task ${taskIndex}]     Brand filter: ${value.replace('filter-brands-', '')}`);
                     checkboxesClicked.push(checkbox);
                     await clickLikeHuman(checkbox);
-                    await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+                    await waitForAmazonContent(page);
                     await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
                   }
                 }
 
                 if (checkboxesClicked.length > 0) {
                   await autoScroll(page, 10, 500);
-                  await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+                  await waitForAmazonContent(page);
                   await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
                   for (const checkbox of checkboxesClicked) {
                     await clickLikeHuman(checkbox);
-                    await page.waitForLoadState('networkidle', { timeout: WAIT_FOR_NETWORK_IDLE_TIMEOUT });
+                    await waitForAmazonContent(page);
                     await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
                   }
                 }
@@ -248,12 +304,14 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
                 responseListener = null;
               }
 
+              console.log(`[Task ${taskIndex}]   Back to category: ${categoryName}`);
               const categoryButton = departmentsContainer.getByRole('button', { name: categoryName, exact: true }).first();
               await categoryButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
               await clickLikeHuman(categoryButton);
               await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
             }
 
+            console.log(`[Task ${taskIndex}]   Back to all departments`);
             try {
               const breadcrumbButton = departmentsContainer.getByTestId('breadcrumb').getByRole('button').first();
               await breadcrumbButton.waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
@@ -269,16 +327,27 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
           new Promise((_, reject) => setTimeout(() => reject(new Error(`Category timeout after ${CATEGORY_TIMEOUT_MS / 1000}s`)), CATEGORY_TIMEOUT_MS)),
         ]);
       } catch (error: any) {
-        console.error(`[Task ${taskIndex}] Error on category index ${i}, reloading page and skipping to next category:`, error.message);
+        console.error(`[Task ${taskIndex}] Error on category index ${i}: ${error.message}`);
 
         if (responseListener) {
           page.off('response', responseListener);
           responseListener = null;
         }
 
+        const isClosed = pageClosed || error.message?.includes('Target page, context or browser has been closed');
+
+        if (isClosed) {
+          console.log(`[Task ${taskIndex}] Browser was closed, recreating and reloading...`);
+          try {
+            await recreateBrowser();
+          } catch (recreateError: any) {
+            console.error(`[Task ${taskIndex}] Failed to recreate browser:`, recreateError.message);
+            break;
+          }
+        }
+
         try {
           ({ departmentsContainer, mainDepartments } = await setupFilters());
-          // Don't reset i: for-loop's i++ will move to the next category
           if (i >= mainDepartments.length) break;
           continue;
         } catch (setupError: any) {
