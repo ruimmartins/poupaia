@@ -3,7 +3,7 @@ import { Message, searchProducts, getAllCategories, createOrUpdateActivity, setM
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
 import { sendProductsToUser, mergeOrAppendQuery } from '@poupaia/shared';
 import { Db } from 'mongodb';
-import { handleInterestsCommand } from './interests';
+import { handleInterestsAICommand } from './interests-ai';
 
 export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, messages: Message[]): Promise<void> => {
   console.log(`[idleWorkflow] Start chatId=${chatId} userId=${user.id} messages=${messages.length}`);
@@ -58,7 +58,7 @@ export const handleIdleWorkflow = async (db: Db, chatId: number, user: User, mes
 
     case IdleIntentTypeEnum.SAVE_INTERESTS:
       await updateUserState(db, user.id, { state: UserStateEnum.SETTING_INTERESTS });
-      await handleInterestsCommand(db, chatId, user.id);
+      await handleInterestsAICommand(db, chatId, user.id);
       break;
 
     case IdleIntentTypeEnum.IRRELEVANT:

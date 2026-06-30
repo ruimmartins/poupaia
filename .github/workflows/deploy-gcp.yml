@@ -61,5 +61,6 @@ jobs:
           env_vars: |
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+            DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}
             MONGODB_URI=${{ secrets.MONGODB_URI }}
             MONGODB_PRODUCTS_DB_NAME=${{ secrets.MONGODB_PRODUCTS_DB_NAME }}

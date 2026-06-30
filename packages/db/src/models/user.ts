@@ -22,13 +22,24 @@ export interface NotificationPrefs {
   maxResultsPerCategory: number;
 }
 
+export interface InterestItem {
+  query: string;
+  categories: string[];
+  brands?: string[];
+  includeKeywords?: string[];
+  excludeKeywords?: string[];
+  excludeBrands?: string[];
+  embedding?: number[];
+  createdAt: string;
+}
+
 export interface User {
   id: number;
   createdAt: string;
   state: UserStateEnum;
   profile: Profile;
   queries?: UserQueries[];
-  interests?: string[];
+  interests?: InterestItem[];
   notificationPrefs?: NotificationPrefs;
   chatId: number;
 }

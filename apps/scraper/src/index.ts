@@ -3,10 +3,10 @@ import path from 'path';
 import { existsSync } from 'fs';
 import { Listr } from 'listr2';
 import { scrapAmazon } from './amazon';
-import { connectToDatabase, closeConnection, Product, createOrUpdateProducts, deleteInvalidProducts, getAllUsers, getProductsCollection } from '@poupaia/db';
+import { connectToDatabase, closeConnection, Product, createOrUpdateProducts, deleteInvalidProducts, getAllUsers, getProductsCollection, searchProductsByInterests, generateProductEmbeddings, InterestItem } from '@poupaia/db';
+import { generateEmbedding } from '@poupaia/ai';
 import { sendProductsToUser } from '@poupaia/shared';
 
-// Carregar .env da pasta apps/scraper (apenas em desenvolvimento local)
 const envPath = path.resolve(__dirname, '../.env');
 if (existsSync(envPath)) {
   dotenv.config({ path: envPath });
@@ -14,7 +14,7 @@ if (existsSync(envPath)) {
 
 const main = async () => {
   const startTime = Date.now();
-  const PARALLEL_TASKS = 1; // Número de scrapers em paralelo
+  const PARALLEL_TASKS = 1;
 
   const tasks = new Listr([
     {
@@ -22,7 +22,7 @@ const main = async () => {
       skip: process.env.NO_SCRAPING === 'true' || process.env.SKIP_WAIT === 'true',
       task: async (ctx, task) => {
         const oneHour = 1000 * 60 * 60;
-        const delay = Math.floor(Math.random() * oneHour); // Delay aleatório entre 0h e 1h
+        const delay = Math.floor(Math.random() * oneHour);
         await new Promise(resolve => setTimeout(resolve, delay));
         task.title = `Waited: ${(delay / 1000 / 60).toFixed(2)} minutos`;
       },
@@ -36,7 +36,7 @@ const main = async () => {
     },
     {
       title: 'Scraping Amazon em paralelo...',
-      skip: process.env.NO_SCRAPING === 'true', // Pular em produção
+      skip: process.env.NO_SCRAPING === 'true',
       task: async (ctx, task) => {
         const scrapingTasks = Array.from({ length: PARALLEL_TASKS }, (_, index) =>
           scrapAmazon(index, PARALLEL_TASKS, progress => {
@@ -63,7 +63,7 @@ const main = async () => {
     },
     {
       title: 'A guardar produtos no MongoDB',
-      skip: process.env.NO_SCRAPING === 'true', // Pular em produção
+      skip: process.env.NO_SCRAPING === 'true',
       task: async (ctx, task) => {
         const products: Product[] = ctx.products;
 
@@ -75,6 +75,17 @@ const main = async () => {
         const result = await createOrUpdateProducts(ctx.db, products);
 
         task.title = `${result.upsertedCount} novos, ${result.modifiedCount} atualizados (${products.length} total)`;
+      },
+    },
+    {
+      title: 'A gerar embeddings para produtos novos',
+      skip: process.env.NO_SCRAPING === 'true',
+      task: async (ctx, task) => {
+        await generateProductEmbeddings(ctx.db, async (contents) => {
+          const result = await generateEmbedding(contents);
+          return result;
+        });
+        task.title = 'Embeddings gerados';
       },
     },
     {
@@ -100,48 +111,101 @@ const main = async () => {
             continue;
           }
 
+          const prefs = user.notificationPrefs ?? { minDiscountLevel: 'razoavel', maxResultsPerCategory: 0 };
+
           if (!user.interests || user.interests.length === 0) {
-            console.log(`[notifyUsers] User ${user.id} has no interests, skipping`);
+            console.log(`[notifyUsers] User ${user.id} has no interests, sending excelente deals`);
+
+            const excelenteProducts = await productsCollection
+              .find({ discountLevel: 'excelente' })
+              .sort({ discountPercentage: -1 })
+              .limit(prefs.maxResultsPerCategory > 0 ? prefs.maxResultsPerCategory : 10)
+              .toArray();
+
+            const productsToSend = excelenteProducts.filter(
+              product => !product.sentToUserIds || !product.sentToUserIds.includes(user.id)
+            );
+
+            if (productsToSend.length > 0) {
+              await sendProductsToUser(ctx.db, user.id, user.chatId, productsToSend, true);
+
+              const productIds = productsToSend.map(p => p.id);
+              await productsCollection.updateMany(
+                { id: { $in: productIds } },
+                { $addToSet: { sentToUserIds: user.id } }
+              );
+
+              totalSentProducts += productsToSend.length;
+              console.log(`[notifyUsers] User ${user.id} (no interests) sent ${productsToSend.length} excelente products`);
+            }
             continue;
           }
-
-          const prefs = user.notificationPrefs ?? { minDiscountLevel: 'razoavel', maxResultsPerCategory: 0 };
-          const maxResultsPerCat = prefs.maxResultsPerCategory > 0 ? prefs.maxResultsPerCategory : 0;
 
           const DISCOUNT_LEVELS = ['razoavel', 'bom', 'excelente'] as const;
           const minLevelIdx = DISCOUNT_LEVELS.indexOf(prefs.minDiscountLevel);
           const allowedLevels = DISCOUNT_LEVELS.slice(minLevelIdx);
 
-          const baseQuery: any = {
-            discountLevel: { $in: allowedLevels },
-          };
+          const maxPerInterest = prefs.maxResultsPerCategory > 0 ? prefs.maxResultsPerCategory : 20;
 
-          let foundProducts;
+          const interestsWithEmbeddings = user.interests.filter((i): i is InterestItem & { embedding: number[] } =>
+            typeof i !== 'string' && !!(i as InterestItem).embedding && (i as InterestItem).embedding!.length > 0
+          );
 
-          if (maxResultsPerCat > 0) {
-            // Query per-category with individual limits
-            const perCategoryResults = await Promise.all(
-              user.interests.map(interest =>
-                productsCollection
-                  .find({ ...baseQuery, parentCategory: interest })
-                  .sort({ discountPercentage: -1 })
-                  .limit(maxResultsPerCat)
-                  .toArray()
-              )
-            );
-            foundProducts = perCategoryResults.flat();
+          let foundProducts: Product[];
+
+          if (interestsWithEmbeddings.length > 0) {
+            foundProducts = await searchProductsByInterests(ctx.db, interestsWithEmbeddings, {
+              allowedLevels,
+              maxPerInterest,
+              excludeProductIds: [],
+              minDiscountPercentage: 0,
+            });
           } else {
-            const categoryQueries = user.interests.map(interest => ({
-              parentCategory: interest,
-            }));
-
-            foundProducts = await productsCollection
-              .find({ ...baseQuery, $or: categoryQueries })
-              .sort({ discountPercentage: -1 })
-              .toArray();
+            foundProducts = [];
           }
 
-          // Filter out products already sent to this user
+          const simpleInterests = user.interests.filter(
+            i => typeof i === 'string' || !(i as InterestItem).embedding || (i as InterestItem).embedding!.length === 0
+          );
+
+          if (simpleInterests.length > 0) {
+            const categoryNames = simpleInterests.map(i =>
+              typeof i === 'string' ? i : (i as InterestItem).categories
+            ).flat().filter((v, idx, arr) => arr.indexOf(v) === idx);
+
+            if (categoryNames.length > 0) {
+              const baseQuery: any = {
+                discountLevel: { $in: allowedLevels },
+              };
+
+              let categoryProducts;
+              if (maxPerInterest > 0) {
+                const perCategoryResults = await Promise.all(
+                  categoryNames.map(cat =>
+                    productsCollection
+                      .find({ ...baseQuery, parentCategory: cat })
+                      .sort({ discountPercentage: -1 })
+                      .limit(maxPerInterest)
+                      .toArray()
+                  )
+                );
+                categoryProducts = perCategoryResults.flat();
+              } else {
+                categoryProducts = await productsCollection
+                  .find({ ...baseQuery, parentCategory: { $in: categoryNames } })
+                  .sort({ discountPercentage: -1 })
+                  .toArray();
+              }
+
+              const existingIds = new Set(foundProducts.map(p => p.id));
+              for (const p of categoryProducts) {
+                if (!existingIds.has(p.id)) {
+                  foundProducts.push(p);
+                }
+              }
+            }
+          }
+
           const productsToSend = foundProducts.filter(
             product => !product.sentToUserIds || !product.sentToUserIds.includes(user.id)
           );
@@ -151,7 +215,6 @@ const main = async () => {
           if (productsToSend.length > 0) {
             await sendProductsToUser(ctx.db, user.id, user.chatId, productsToSend, true);
 
-            // Update products to track that this user received them
             const productIds = productsToSend.map(p => p.id);
             await productsCollection.updateMany(
               { id: { $in: productIds } },

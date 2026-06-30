@@ -1,4 +1,4 @@
-import { handleInterestsCommand } from './workflows/interests';
+import { handleInterestsAICommand } from './workflows/interests-ai';
 import { handleNotifPrefsCommand } from './workflows/notif-prefs';
 import { closeConnection, connectToDatabase, getOrCreateUser, updateUserState, UserStateEnum } from '@poupaia/db';
 import { escapeMarkdownV2, sendTelegramMessage, MESSAGES, getRandomMessage } from '@poupaia/messaging';
@@ -19,14 +19,14 @@ export const handleRequest = async (message: any): Promise<void> => {
       console.log('[handleRequest] /start command received');
       await sendTelegramMessage(chatId, MESSAGES.START(message.from?.first_name));
       await updateUserState(db, userId, { state: UserStateEnum.SETTING_INTERESTS });
-      await handleInterestsCommand(db, chatId, userId);
+      await handleInterestsAICommand(db, chatId, userId);
       return;
     }
 
     if (message.text?.trim() === '/interesses') {
       console.log('[handleRequest] /interesses command received');
       await updateUserState(db, userId, { state: UserStateEnum.SETTING_INTERESTS });
-      await handleInterestsCommand(db, chatId, userId);
+      await handleInterestsAICommand(db, chatId, userId);
       return;
     }
 
@@ -37,10 +37,15 @@ export const handleRequest = async (message: any): Promise<void> => {
       return;
     }
 
-    // Para qualquer outra mensagem, lembrar o utilizador de usar o menu de interesses
+    if (user.state === UserStateEnum.SETTING_INTERESTS && message.text?.trim()) {
+      console.log('[handleRequest] Text in SETTING_INTERESTS state, routing to AI interests');
+      await handleInterestsAICommand(db, chatId, userId, message.text.trim());
+      return;
+    }
+
     await sendTelegramMessage(
       chatId,
-      escapeMarkdownV2('Usa o comando /interesses para definir as tuas categorias favoritas e receber notificações de promoções!')
+      escapeMarkdownV2('Escolhe uma das opções do menu:\n\n/interesses — Definir interesses de produtos\n/preferencias — Configurar notificações')
     );
 
     console.log('[handleRequest] Done');
