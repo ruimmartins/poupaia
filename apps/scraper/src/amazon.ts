@@ -3,17 +3,9 @@ import { getBrowser, autoScroll, clickLikeHuman, randomTimeout, WAIT_FOR_NAVIGAT
 
 const PROMOTIONS_REGEX = /\/api\/marketplaces\/.*\/promotions/;
 const CATEGORY_TIMEOUT_MS = 10 * 60 * 1000;
-const WAIT_FOR_PROMOTIONS_TIMEOUT = 15000;
 
-const waitForAmazonContent = async (page: any) => {
-  try {
-    await page.waitForResponse(
-      (response: any) => PROMOTIONS_REGEX.test(response.url()) && response.status() === 200,
-      { timeout: WAIT_FOR_PROMOTIONS_TIMEOUT }
-    );
-  } catch {
-    await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
-  }
+const waitAfterAction = async (page: any, ms: number) => {
+  await page.waitForTimeout(randomTimeout(ms));
 };
 
 type DiscountLevel = 'fraco' | 'razoavel' | 'bom' | 'excelente';
@@ -250,8 +242,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
             const categoryName = await filter.innerText();
             console.log(`[Task ${taskIndex}] Category ${i + 1}/${mainDepartments.length}: ${categoryName}`);
             await clickLikeHuman(filter);
-            await waitForAmazonContent(page);
-            await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+            await waitAfterAction(page, WAIT_FOR_NAVIGATION_TIMEOUT * 2);
 
             const subDepartmentsLocator = departmentsContainer.locator('[role="radiogroup"]').first().locator('[data-testid^="filter-departments-"]');
             await subDepartmentsLocator.first().waitFor({ state: 'visible', timeout: WAIT_FOR_SELECTOR_TIMEOUT });
@@ -269,34 +260,43 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
 
               try {
                 await clickLikeHuman(subFilter);
-                await waitForAmazonContent(page);
-                await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+                await waitAfterAction(page, WAIT_FOR_NAVIGATION_TIMEOUT * 2);
                 await autoScroll(page, 10, 500);
-                await waitForAmazonContent(page);
-                await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+                await waitAfterAction(page, WAIT_FOR_NAVIGATION_TIMEOUT);
+
+                const brandSetLower = brands.map(b => b.toLowerCase());
+                const matchingBrandSlugs: string[] = await page.evaluate((brandSetArr: string[]) => {
+                  const brandSet = new Set(brandSetArr);
+                  const checkboxes = document.querySelectorAll('[data-tabulation-id="desktop-refinements"] div[data-csa-c-element-id^="filter-brands"]');
+                  const result: string[] = [];
+                  checkboxes.forEach((cb) => {
+                    const value = cb.getAttribute('data-csa-c-element-id');
+                    if (value) {
+                      const brandName = value.replace('filter-brands-', '').toLowerCase();
+                      if (brandSet.has(brandName)) {
+                        result.push(value);
+                      }
+                    }
+                  });
+                  return result;
+                }, brandSetLower);
 
                 let checkboxesClicked: any[] = [];
-                const brandsCheckbox = await departmentsContainer.locator('div[data-csa-c-element-id^="filter-brands"]').all();
 
-                for (const checkbox of brandsCheckbox) {
-                  const value = await checkbox.getAttribute('data-csa-c-element-id');
-                  if (value && brands.some(b => b.toLowerCase() === value.replace('filter-brands-', '').toLowerCase())) {
-                    console.log(`[Task ${taskIndex}]     Brand filter: ${value.replace('filter-brands-', '')}`);
-                    checkboxesClicked.push(checkbox);
-                    await clickLikeHuman(checkbox);
-                    await waitForAmazonContent(page);
-                    await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
-                  }
+                for (const slug of matchingBrandSlugs) {
+                  const checkbox = departmentsContainer.locator(`div[data-csa-c-element-id="${slug}"]`);
+                  console.log(`[Task ${taskIndex}]     Brand filter: ${slug.replace('filter-brands-', '')}`);
+                  checkboxesClicked.push(checkbox);
+                  await clickLikeHuman(checkbox);
+                  await waitAfterAction(page, WAIT_FOR_NAVIGATION_TIMEOUT);
                 }
 
                 if (checkboxesClicked.length > 0) {
                   await autoScroll(page, 10, 500);
-                  await waitForAmazonContent(page);
-                  await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+                  await waitAfterAction(page, WAIT_FOR_NAVIGATION_TIMEOUT);
                   for (const checkbox of checkboxesClicked) {
                     await clickLikeHuman(checkbox);
-                    await waitForAmazonContent(page);
-                    await page.waitForTimeout(randomTimeout(WAIT_FOR_NAVIGATION_TIMEOUT));
+                    await waitAfterAction(page, WAIT_FOR_NAVIGATION_TIMEOUT);
                   }
                 }
               } finally {
@@ -334,22 +334,18 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
           responseListener = null;
         }
 
-        const isClosed = pageClosed || error.message?.includes('Target page, context or browser has been closed');
-
-        if (isClosed) {
-          console.log(`[Task ${taskIndex}] Browser was closed, recreating and reloading...`);
-          try {
-            await recreateBrowser();
-          } catch (recreateError: any) {
-            console.error(`[Task ${taskIndex}] Failed to recreate browser:`, recreateError.message);
-            break;
-          }
+        console.log(`[Task ${taskIndex}] Recreating browser after category error...`);
+        try {
+          await recreateBrowser();
+        } catch (recreateError: any) {
+          console.error(`[Task ${taskIndex}] Failed to recreate browser:`, recreateError.message);
+          break;
         }
 
         try {
           ({ departmentsContainer, mainDepartments } = await setupFilters());
           if (i >= mainDepartments.length) break;
-          continue;
+          // Fall through to for-loop increment to skip this failed category
         } catch (setupError: any) {
           console.error(`[Task ${taskIndex}] Failed to reload page after category error:`, setupError.message);
           break;
