@@ -168,6 +168,18 @@ const createIndexes = async () => {
                 numDimensions: vectorDimensions,
                 similarity: vectorSimilarity,
               },
+              {
+                type: 'filter',
+                path: 'id',
+              },
+              {
+                type: 'filter',
+                path: 'discountLevel',
+              },
+              {
+                type: 'filter',
+                path: 'discountPercentage',
+              },
             ],
           };
 

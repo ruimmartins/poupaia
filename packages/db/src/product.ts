@@ -299,7 +299,7 @@ export const generateProductEmbeddings = async (db: Db, generateEmbeddingFn: (co
 
   for (let i = 0; i < products.length; i += BATCH_SIZE) {
     const batch = products.slice(i, i + BATCH_SIZE);
-    const titles = batch.map(p => p.title);
+    const titles = batch.map(p => `${p.title}, Category: ${p.parentCategory || ''}`);
 
     try {
       const embeddings = await generateEmbeddingFn(titles);
