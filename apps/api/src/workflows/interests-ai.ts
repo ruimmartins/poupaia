@@ -23,16 +23,17 @@ const pendingExtractions = new Map<number, PendingExtraction>();
 
 const formatInterestLine = (op: PendingExtraction['operations'][0]): string => {
   const { action, interest } = op;
-  const cats = interest.categories.join(', ');
+  const cats = (interest?.categories ?? []).join(', ');
+  const query = interest?.query ?? '';
   const details: string[] = [];
 
-  if (interest.brands?.length) {
+  if (interest?.brands?.length) {
     details.push(`marcas: ${interest.brands.join(', ')}`);
   }
-  if (interest.includeKeywords?.length) {
+  if (interest?.includeKeywords?.length) {
     details.push(`inclui: ${interest.includeKeywords.join(', ')}`);
   }
-  if (interest.excludeKeywords?.length) {
+  if (interest?.excludeKeywords?.length) {
     details.push(`exclui: ${interest.excludeKeywords.join(', ')}`);
   }
 
@@ -40,13 +41,13 @@ const formatInterestLine = (op: PendingExtraction['operations'][0]): string => {
 
   switch (action) {
     case 'add':
-      return `➕ Novo: *${interest.query}* — ${cats}${detailStr}`;
+      return `➕ Novo: *${query}* — ${cats}${detailStr}`;
     case 'update':
       return `✏️ Atualizar: *${op.targetQuery}*${detailStr}`;
     case 'remove':
-      return `🗑️ Remover: *${op.targetQuery || interest.query}*`;
+      return `🗑️ Remover: *${op.targetQuery || query}*`;
     default:
-      return `• ${interest.query}`;
+      return `• ${query}`;
   }
 };
 
@@ -88,7 +89,7 @@ export const handleInterestsAICommand = async (db: Db, chatId: number, userId: n
         if (i.excludeKeywords?.length) parts.push(`exclui: ${i.excludeKeywords.join(', ')}`);
         if (i.excludeBrands?.length) parts.push(`exclui marcas: ${i.excludeBrands.join(', ')}`);
         const detail = parts.length > 0 ? ` — ${parts.join('; ')}` : '';
-        return `• *${i.query}* (${i.categories.join(', ')})${detail}`;
+        return `• *${i.query}* (${(i.categories ?? []).join(', ')})${detail}`;
       });
 
       message = escapeMarkdownV2(
@@ -232,7 +233,7 @@ export const handleInterestsAICallback = async (db: Db, chatId: number, userId: 
       if (i.brands?.length) parts.push(`marcas: ${i.brands.join(', ')}`);
       if (i.excludeKeywords?.length) parts.push(`exclui: ${i.excludeKeywords.join(', ')}`);
       const detail = parts.length > 0 ? ` — ${parts.join('; ')}` : '';
-      return `• *${i.query}* (${i.categories.join(', ')})${detail}`;
+      return `• *${i.query}* (${(i.categories ?? []).join(', ')})${detail}`;
     });
 
     const msg = updatedInterests.length > 0

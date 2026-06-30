@@ -131,7 +131,29 @@ export const extractInterests = async (
       return { operations: [] };
     }
 
-    return parsed;
+    const sanitizeInterest = (interest: unknown): InterestOperation['interest'] => {
+      if (!interest || typeof interest !== 'object') {
+        return { query: '', categories: [] };
+      }
+      const i = interest as Record<string, unknown>;
+      return {
+        query: typeof i.query === 'string' ? i.query : '',
+        categories: Array.isArray(i.categories) ? i.categories.filter((c: unknown): c is string => typeof c === 'string') : [],
+        brands: Array.isArray(i.brands) ? i.brands.filter((b: unknown): b is string => typeof b === 'string') : undefined,
+        includeKeywords: Array.isArray(i.includeKeywords) ? i.includeKeywords.filter((k: unknown): k is string => typeof k === 'string') : undefined,
+        excludeKeywords: Array.isArray(i.excludeKeywords) ? i.excludeKeywords.filter((k: unknown): k is string => typeof k === 'string') : undefined,
+      };
+    };
+
+    const operations: InterestOperation[] = parsed.operations
+      .filter((op: unknown): op is Record<string, unknown> => !!op && typeof op === 'object')
+      .map((op): InterestOperation => ({
+        action: (['add', 'update', 'remove'].includes(op.action as string) ? op.action : 'add') as InterestOperation['action'],
+        interest: sanitizeInterest(op.interest),
+        targetQuery: typeof op.targetQuery === 'string' ? op.targetQuery : undefined,
+      }));
+
+    return { operations };
   } catch (error) {
     console.error('Erro ao extrair interesses com DeepSeek:', error);
     return { operations: [] };
