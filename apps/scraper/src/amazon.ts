@@ -121,7 +121,9 @@ const parseProductData = (data: any, currentCategory: string, amazonTopLevel: st
   return result;
 };
 
-export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1) => {
+export type ScrapProgress = { categoryIndex: number; categoryTotal: number; categoryName: string };
+
+export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1, onProgress?: (progress: ScrapProgress) => void) => {
   let { page, browser } = await getBrowser();
 
   const products: Product[] = [];
@@ -241,6 +243,7 @@ export const scrapAmazon = async (taskIndex: number = 0, totalTasks: number = 1)
             const filter = mainDepartments[i];
             const categoryName = await filter.innerText();
             console.log(`[Task ${taskIndex}] Category ${i + 1}/${mainDepartments.length}: ${categoryName}`);
+            onProgress?.({ categoryIndex: i + 1, categoryTotal: mainDepartments.length, categoryName });
             await clickLikeHuman(filter);
             await waitAfterAction(page, WAIT_FOR_NAVIGATION_TIMEOUT * 2);
 

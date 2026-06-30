@@ -39,7 +39,9 @@ const main = async () => {
       skip: process.env.NO_SCRAPING === 'true', // Pular em produção
       task: async (ctx, task) => {
         const scrapingTasks = Array.from({ length: PARALLEL_TASKS }, (_, index) =>
-          scrapAmazon(index, PARALLEL_TASKS)
+          scrapAmazon(index, PARALLEL_TASKS, progress => {
+            task.title = `Scraping [${progress.categoryIndex}/${progress.categoryTotal}]: ${progress.categoryName}`;
+          })
             .then(products => {
               return products;
             })
